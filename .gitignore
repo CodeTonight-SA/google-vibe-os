@@ -3,6 +3,9 @@ node_modules/
 venv/
 __pycache__/
 
+# MCP servers (user-installed)
+google-mcp-servers/
+
 # Environment and Secrets
 .env
 credentials.json
