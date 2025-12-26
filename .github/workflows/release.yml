@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (e.g., v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            build_cmd: npm run build:mac
+            asset_name: Googol-Vibe-${{ github.ref_name || inputs.version }}-arm64.dmg
+            asset_path: dashboard/release/*.dmg
+          - os: windows-latest
+            build_cmd: npm run build:win
+            asset_name: Googol-Vibe-${{ github.ref_name || inputs.version }}-Setup.exe
+            asset_path: dashboard/release/*Setup*.exe
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build
+        working-directory: dashboard
+        run: ${{ matrix.build_cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: ${{ matrix.asset_path }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos-latest
+          path: ./artifacts
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows-latest
+          path: ./artifacts
+
+      - name: List artifacts
+        run: ls -la ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || inputs.version }}
+          name: ${{ github.ref_name || inputs.version }}
+          body: |
+            ## Installation
+
+            **macOS:**
+            1. Download the DMG file
+            2. Open and drag to Applications
+            3. If blocked, run: `xattr -cr /Applications/Googol\ Vibe.app`
+
+            **Windows:**
+            1. Download the Setup.exe
+            2. Run the installer
+
+            Full changelog: https://github.com/${{ github.repository }}/commits/${{ github.ref_name || inputs.version }}
+          files: ./artifacts/*
+          draft: false
+          prerelease: ${{ contains(github.ref_name || inputs.version, 'beta') || contains(github.ref_name || inputs.version, 'alpha') }}

@@ -1,0 +1,2033 @@
+/* Swiss Nihilism Design System - Pure Reduction */
+:root {
+    --bg-color: #ffffff;
+    --card-bg: #ffffff;
+    --card-border: #000000;
+    --text-primary: #000000;
+    --text-heading: #000000;
+    --text-secondary: #666666;
+    --accent-primary: #000000;
+    --accent-secondary: #000000;
+    --border-color: #000000;
+    --muted: #888888;
+    --dark: #000000;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --radius-lg: 0;
+    --radius-md: 0;
+    --font-main: "Helvetica Neue", Helvetica, Arial, -apple-system, sans-serif;
+    --font-mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-display: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-main);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    background-image: none;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+.dashboard-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 40px 32px;
+}
+
+.header {
+    margin-bottom: 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-content h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-heading);
+    margin: 0;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+}
+
+.header-content p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-top: 8px;
+    font-weight: 400;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 32px;
+}
+
+.col-span-8 {
+    grid-column: span 8;
+}
+
+.col-span-4 {
+    grid-column: span 4;
+}
+
+.col-span-9 {
+    grid-column: span 9;
+}
+
+.col-span-3 {
+    grid-column: span 3;
+}
+
+.col-span-12 {
+    grid-column: span 12;
+}
+
+.col-span-6 {
+    grid-column: span 6;
+}
+
+.col-span-5 {
+    grid-column: span 5;
+}
+
+.col-span-7 {
+    grid-column: span 7;
+}
+
+/* Widget Scroll Containers */
+.widget-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-primary) transparent;
+}
+
+.widget-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.widget-scroll::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 2px;
+}
+
+.widget-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.widget-scroll-sm {
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-primary) transparent;
+}
+
+.widget-scroll-sm::-webkit-scrollbar {
+    width: 4px;
+}
+
+.widget-scroll-sm::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 2px;
+}
+
+.widget-scroll-sm::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Document Horizontal Scroll */
+.doc-scroll {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-primary) transparent;
+}
+
+.doc-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+
+.doc-scroll::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 2px;
+}
+
+.doc-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.doc-card {
+    min-width: 180px;
+    max-width: 180px;
+    flex-shrink: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0;
+    padding: 16px;
+    cursor: pointer;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.doc-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent-primary);
+}
+
+/* Text Truncation */
+.item-title-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 8px;
+}
+
+@media (max-width: 1200px) {
+    .col-span-8,
+    .col-span-7,
+    .col-span-6,
+    .col-span-5,
+    .col-span-4,
+    .col-span-9,
+    .col-span-3 {
+        grid-column: span 12;
+    }
+
+    .widget-scroll,
+    .widget-scroll-sm {
+        max-height: none;
+    }
+
+    .doc-scroll {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .doc-card {
+        min-width: calc(50% - 8px);
+        max-width: calc(50% - 8px);
+    }
+}
+
+/* Cards - Swiss Nihilism */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-primary);
+    border-radius: 0;
+    padding: 32px;
+    transition: box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: none;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.card-title {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-heading);
+}
+
+/* List Items */
+.list-item {
+    display: flex;
+    align-items: center;
+    padding: 16px 0;
+    border-radius: 0;
+    margin-bottom: 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.list-item:last-child {
+    border-bottom: none;
+}
+
+.list-item:hover {
+    background: rgba(234, 88, 12, 0.05);
+}
+
+.list-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.item-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.item-sub {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Animations - Minimal */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.loading-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* Skeleton Loader - Swiss Nihilism */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 0%,
+        #e0e0e0 50%,
+        #f0f0f0 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-sub {
+    margin-top: 8px;
+}
+
+.skeleton-doc {
+    pointer-events: none;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* File Grid */
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 20px;
+}
+
+.file-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: box-shadow 0.2s;
+}
+
+.file-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.file-thumb {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 0;
+    margin-bottom: 12px;
+    background: #f3f4f6;
+    filter: grayscale(100%);
+    transition: filter 0.3s;
+}
+
+.file-card:hover .file-thumb {
+    filter: grayscale(0%);
+}
+
+/* Badge */
+.badge {
+    background: var(--text-heading);
+    color: #ffffff;
+    padding: 4px 10px;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Agent Panel - CLI Terminal Style */
+.agent-panel {
+    background: var(--dark);
+    border: 1px solid #374151;
+    border-left: 3px solid var(--accent-primary);
+    border-radius: 0;
+}
+
+.agent-panel .card-header {
+    border-bottom: 1px solid #374151;
+    padding-bottom: 16px;
+}
+
+.agent-panel .card-title {
+    color: #f3f4f6;
+}
+
+.agent-panel .badge {
+    background: var(--accent-primary);
+}
+
+.agent-chat-area {
+    flex-grow: 1;
+    background: transparent;
+    border-radius: 0;
+    margin: 16px 0;
+    border: none;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.agent-input-container {
+    display: flex;
+    gap: 8px;
+}
+
+.agent-input {
+    flex-grow: 1;
+    padding: 12px 16px;
+    border-radius: 0;
+    border: 1px solid #4b5563;
+    background: #374151;
+    color: #f3f4f6;
+    font-family: var(--font-main);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.agent-input::placeholder {
+    color: #9ca3af;
+}
+
+.agent-input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: none;
+}
+
+/* Buttons */
+.btn-primary {
+    background: var(--text-heading);
+    color: #ffffff;
+    padding: 1rem 2rem;
+    border-radius: 0;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+    background: var(--accent-primary);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--text-heading);
+    color: var(--text-heading);
+    padding: 1rem 2rem;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-secondary:hover {
+    background: var(--text-heading);
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   Onboarding Wizard - Swiss Nihilism
+   ========================================================================== */
+
+.onboarding-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 40px;
+    background: var(--bg-color);
+}
+
+.loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+}
+
+/* Progress Indicator - Swiss Grid */
+.onboarding-progress {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 80px;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    padding: 0 24px;
+}
+
+.progress-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    left: calc(50% + 24px);
+    width: calc(100% - 48px);
+    height: 1px;
+    background: #e0e0e0;
+}
+
+.progress-step.completed:not(:last-child)::after {
+    background: var(--text-primary);
+}
+
+.step-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 0;
+    border: 1px solid #e0e0e0;
+    background: var(--card-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #999999;
+    z-index: 1;
+    transition: all 0.2s ease;
+}
+
+.progress-step.active .step-dot {
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.progress-step.completed .step-dot {
+    background: var(--text-primary);
+    border-color: var(--text-primary);
+    color: white;
+}
+
+.step-label {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #999999;
+    font-weight: 400;
+}
+
+.progress-step.active .step-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.progress-step.completed .step-label {
+    color: var(--text-primary);
+}
+
+/* Step Content - Swiss Typography */
+.onboarding-content {
+    width: 100%;
+    max-width: 560px;
+}
+
+.step-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.step-content h1,
+.step-content h2 {
+    font-family: var(--font-display);
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin: 0 0 16px;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+
+.step-content p {
+    font-family: var(--font-display);
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    line-height: 1.5;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.step-icon {
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.success-icon {
+    color: var(--text-primary);
+}
+
+/* Ready Step - Swiss Nihilism */
+.ready-step {
+    padding: 0;
+}
+
+.ready-step .success-animation {
+    margin-bottom: 32px;
+}
+
+.ready-step .sparkle-icon {
+    color: var(--text-primary);
+    stroke-width: 1;
+}
+
+.ready-step .connected-as {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 48px;
+    font-weight: 400;
+}
+
+.ready-step .connected-as strong {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.ready-step .feature-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto 48px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.ready-step .feature-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    width: 100%;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.ready-step .feature-row .check-icon {
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+.ready-step .feature-row svg:not(.check-icon) {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.ready-step .feature-row span {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    font-weight: 400;
+}
+
+.ready-step .tip-text {
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    color: var(--muted);
+    margin-top: 48px;
+    font-weight: 400;
+}
+
+/* Large Primary Button */
+.primary-button.large {
+    padding: 20px 48px;
+    font-size: 0.8125rem;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+    background: var(--text-primary);
+    border: none;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.primary-button.large:hover {
+    opacity: 0.85;
+    background: var(--text-primary);
+}
+
+/* Welcome Step */
+.welcome-step .welcome-logo {
+    margin-bottom: 16px;
+}
+
+.welcome-step .logo-icon {
+    color: var(--accent-primary);
+}
+
+.welcome-subtitle {
+    font-size: 1.1rem;
+    font-weight: 400;
+}
+
+.feature-grid {
+    display: flex;
+    gap: 24px;
+    margin: 32px 0;
+}
+
+.feature-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 24px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.feature-item svg {
+    color: var(--accent-primary);
+}
+
+.feature-item span {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.setup-time {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+/* Buttons - Swiss Nihilism */
+.primary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--text-heading);
+    color: white;
+    padding: 16px 32px;
+    border: none;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    font-weight: 500;
+}
+
+.primary-button:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.primary-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.secondary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    padding: 16px 32px;
+    border: 1px solid #e0e0e0;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.secondary-button:hover {
+    border-color: var(--text-heading);
+    background: var(--text-heading);
+    color: white;
+}
+
+.text-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    padding: 8px 0;
+    margin-top: 24px;
+}
+
+.text-button:hover {
+    color: var(--text-primary);
+}
+
+.link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--accent-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    padding: 8px 0;
+    margin-bottom: 24px;
+}
+
+.link-button:hover {
+    text-decoration: underline;
+}
+
+.button-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 32px;
+}
+
+/* Choice Cards (GCP Setup) */
+.choice-cards {
+    display: flex;
+    gap: 16px;
+    margin: 24px 0;
+    width: 100%;
+}
+
+.choice-card {
+    flex: 1;
+    padding: 24px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.choice-card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-md);
+}
+
+.choice-card.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.choice-card svg {
+    color: var(--accent-primary);
+    margin-bottom: 12px;
+}
+
+.choice-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-heading);
+}
+
+.choice-card p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.coming-soon {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 4px 8px;
+    background: var(--border-color);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+
+/* Checklist */
+.checklist {
+    width: 100%;
+    margin: 16px 0 24px;
+    text-align: left;
+}
+
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.checklist-item:hover {
+    border-color: var(--accent-primary);
+}
+
+.checklist-item.checked {
+    background: rgba(234, 88, 12, 0.05);
+    border-color: var(--accent-primary);
+}
+
+.checklist-item .checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.checklist-item.checked .checkbox {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.checklist-item span {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+/* Code Block */
+.code-block {
+    width: 100%;
+    background: var(--dark);
+    padding: 16px;
+    margin: 16px 0 24px;
+    text-align: left;
+}
+
+.code-block code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #a3e635;
+    white-space: pre-wrap;
+}
+
+/* Connect Step */
+.connected-email {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--accent-primary);
+    margin-bottom: 32px;
+}
+
+.permission-list {
+    width: 100%;
+    text-align: left;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 16px 24px;
+    margin-bottom: 24px;
+}
+
+.permission-list h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-heading);
+}
+
+.permission-list ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.permission-list li {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.connect-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #4285f4;
+    color: white;
+    padding: 16px 32px;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-bottom: 24px;
+}
+
+.connect-button:hover:not(:disabled) {
+    background: #3367d6;
+}
+
+.connect-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.help-text {
+    margin-top: 16px;
+}
+
+.help-text p {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+/* Error/Success Messages */
+.error-message,
+.onboarding-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 16px;
+}
+
+/* Spinner Animation */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Animate Pulse (for loading) */
+.animate-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .onboarding-container {
+        padding: 24px;
+    }
+
+    .onboarding-progress {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .progress-step:not(:last-child)::after {
+        display: none;
+    }
+
+    .feature-grid {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .choice-cards {
+        flex-direction: column;
+    }
+
+    .button-row {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .button-row button {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ==========================================================================
+   Waitlist Modal - Swiss Nihilism
+   ========================================================================== */
+
+.waitlist-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+    animation: fadeIn 0.2s ease;
+}
+
+.waitlist-modal {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 480px;
+    padding: 48px;
+    position: relative;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.waitlist-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 8px;
+    transition: color 0.2s;
+}
+
+.waitlist-close:hover {
+    color: var(--text-primary);
+}
+
+.waitlist-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.waitlist-header h2 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--text-heading);
+}
+
+.waitlist-header svg {
+    color: var(--text-primary);
+}
+
+.waitlist-badge {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: var(--text-primary);
+    color: white;
+    padding: 4px 8px;
+    font-weight: 500;
+}
+
+.waitlist-description {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+
+.waitlist-query-preview {
+    background: #f5f5f5;
+    border-left: 3px solid var(--text-primary);
+    padding: 16px;
+    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.query-label {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+
+.query-text {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-style: italic;
+}
+
+.waitlist-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.form-group label .optional {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.form-group input,
+.form-group textarea {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    padding: 14px 16px;
+    border: 1px solid #e0e0e0;
+    background: var(--bg-color);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    resize: none;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: #999999;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--text-primary);
+}
+
+.form-error {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    color: #dc2626;
+    padding: 12px 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+}
+
+.waitlist-submit {
+    margin-top: 8px;
+    width: 100%;
+    justify-content: center;
+}
+
+.waitlist-footer {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 24px;
+    margin-bottom: 0;
+}
+
+/* Waitlist Success State */
+.waitlist-success {
+    text-align: center;
+    padding: 24px 0;
+}
+
+.success-icon-container {
+    width: 64px;
+    height: 64px;
+    border: 1px solid var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+
+.success-icon-container svg {
+    color: var(--text-primary);
+}
+
+.waitlist-success h2 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 12px;
+    color: var(--text-heading);
+}
+
+.waitlist-success p {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+.waitlist-success .primary-button {
+    margin: 0 auto;
+}
+
+/* Responsive */
+@media (max-width: 520px) {
+    .waitlist-modal {
+        padding: 32px 24px;
+    }
+
+    .waitlist-header h2 {
+        font-size: 1.5rem;
+    }
+}
+
+/* ==========================================================================
+   Task Detail Modal - Swiss Nihilism
+   ========================================================================== */
+
+.task-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    padding: 24px;
+}
+
+.task-modal {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.task-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.task-modal-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.task-modal-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.task-modal-unsaved {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    color: #ea580c;
+    font-weight: 400;
+}
+
+.task-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 4px;
+    transition: color 0.2s;
+}
+
+.task-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.task-modal-content {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.task-modal-field {
+    margin-bottom: 20px;
+}
+
+.task-modal-field:last-child {
+    margin-bottom: 0;
+}
+
+.task-modal-field label {
+    display: flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.task-modal-hint {
+    margin-left: auto;
+    font-size: 0.625rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.task-modal-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #e0e0e0;
+    background: var(--bg-color);
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.task-modal-input:focus {
+    border-color: var(--text-primary);
+}
+
+.task-modal-input::placeholder {
+    color: #999999;
+}
+
+.task-modal-date {
+    max-width: 200px;
+}
+
+.task-modal-notes-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.task-modal-edit-btn {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 2px 6px;
+    margin-left: 8px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.task-modal-edit-btn:hover {
+    background: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+}
+
+.task-modal-notes-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    background: rgba(234, 88, 12, 0.06);
+    border: 1px solid rgba(234, 88, 12, 0.15);
+    border-radius: 6px;
+    color: #ea580c;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.task-modal-notes-display {
+    padding: 14px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 0;
+    min-height: 120px;
+    cursor: pointer;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    transition: border-color 0.15s ease;
+}
+
+.task-modal-notes-display:hover {
+    border-color: var(--text-primary);
+}
+
+.task-modal-notes-display strong {
+    font-weight: 600;
+}
+
+.task-modal-notes-display em {
+    font-style: italic;
+    color: #666;
+}
+
+.task-modal-notes-display code {
+    background: #e8e8e8;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.875rem;
+}
+
+.task-modal-notes-display ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.task-modal-notes-display li {
+    margin: 4px 0;
+}
+
+.task-modal-textarea {
+    width: 100%;
+    min-height: 160px;
+    padding: 14px;
+    border: 1px solid #e0e0e0;
+    background: var(--bg-color);
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.task-modal-textarea:focus {
+    border-color: var(--text-primary);
+}
+
+.task-modal-textarea::placeholder {
+    color: #999999;
+}
+
+.task-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+    background: #fafafa;
+    gap: 12px;
+}
+
+.task-modal-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-modal-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.task-modal-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.task-modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.task-modal-btn-primary {
+    background: var(--text-primary);
+    color: white;
+}
+
+.task-modal-btn-primary:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.task-modal-btn-complete {
+    background: #16a34a;
+    color: white;
+}
+
+.task-modal-btn-complete:hover:not(:disabled) {
+    background: #15803d;
+}
+
+.task-modal-btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.task-modal-btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+}
+
+.task-modal-btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid #e0e0e0;
+}
+
+.task-modal-btn-ghost:hover:not(:disabled) {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.task-modal-btn-text {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.task-modal-btn-text:hover {
+    color: var(--text-primary);
+}
+
+.task-modal-delete-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    color: #ef4444;
+}
+
+/* Task List Item Enhancements */
+.task-item-clickable {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.task-item-clickable:hover {
+    background: rgba(234, 88, 12, 0.06);
+}
+
+.task-item-title {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.task-item-has-notes {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #ea580c;
+    font-size: 0.75rem;
+    margin-left: 8px;
+}
+
+.task-item-completed .task-item-title {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+/* Loading indicator for task widget */
+.task-loading-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #ea580c;
+}
+
+.task-loading-dot {
+    width: 6px;
+    height: 6px;
+    background: #ea580c;
+    animation: task-loading-pulse 1s ease-in-out infinite;
+}
+
+@keyframes task-loading-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* ========================================
+   Recurring Tasks
+   ======================================== */
+
+/* Recurring task visual distinction */
+.task-recurring {
+    border-left: 3px solid #ea580c;
+    background: linear-gradient(90deg, rgba(234, 88, 12, 0.04) 0%, transparent 30%);
+}
+
+.task-recurring:hover {
+    background: linear-gradient(90deg, rgba(234, 88, 12, 0.08) 0%, rgba(234, 88, 12, 0.04) 100%);
+}
+
+.task-recurring-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: #ea580c;
+    color: white;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.task-recurring-icon svg {
+    animation: recurring-spin 4s linear infinite;
+}
+
+@keyframes recurring-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Recurring badge in modal */
+.task-modal-recurring-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: #ea580c;
+    color: white;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 8px;
+    font-weight: 600;
+}
+
+/* ========================================
+   Recurrence Picker
+   ======================================== */
+
+.recurrence-picker {
+    position: relative;
+}
+
+.recurrence-picker-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #d1d5db;
+    font-family: var(--font-main);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.recurrence-picker-trigger:hover {
+    border-color: #000;
+}
+
+.recurrence-picker-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.recurrence-picker-trigger.has-recurrence {
+    border-color: #ea580c;
+    background: rgba(234, 88, 12, 0.04);
+}
+
+.recurrence-picker-trigger svg.recurrence-active {
+    color: #ea580c;
+}
+
+.recurrence-chevron {
+    margin-left: auto;
+    transition: transform 0.15s ease;
+    color: var(--text-secondary);
+}
+
+.recurrence-chevron.open {
+    transform: rotate(180deg);
+}
+
+.recurrence-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #000;
+    padding: 16px;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.recurrence-section {
+    margin-bottom: 16px;
+}
+
+.recurrence-section:last-of-type {
+    margin-bottom: 16px;
+}
+
+.recurrence-label {
+    display: block;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.recurrence-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.recurrence-option {
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #d1d5db;
+    font-family: var(--font-main);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.recurrence-option:hover {
+    border-color: #000;
+}
+
+.recurrence-option.selected {
+    background: #000;
+    color: white;
+    border-color: #000;
+}
+
+.recurrence-interval {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.recurrence-input {
+    width: 60px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    font-family: var(--font-main);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.recurrence-input:focus {
+    outline: none;
+    border-color: #000;
+}
+
+.recurrence-unit {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.recurrence-weekdays {
+    display: flex;
+    gap: 4px;
+}
+
+.recurrence-weekday {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1px solid #d1d5db;
+    font-family: var(--font-main);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.recurrence-weekday:hover {
+    border-color: #000;
+}
+
+.recurrence-weekday.selected {
+    background: #ea580c;
+    color: white;
+    border-color: #ea580c;
+}
+
+.recurrence-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.recurrence-btn {
+    padding: 8px 16px;
+    font-family: var(--font-main);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.recurrence-btn-cancel {
+    background: white;
+    border: 1px solid #d1d5db;
+    color: var(--text-secondary);
+}
+
+.recurrence-btn-cancel:hover {
+    border-color: #000;
+    color: #000;
+}
+
+.recurrence-btn-apply {
+    background: #ea580c;
+    border: 1px solid #ea580c;
+    color: white;
+}
+
+.recurrence-btn-apply:hover {
+    background: #c2410c;
+    border-color: #c2410c;
+}
+
+/* Responsive */
+@media (max-width: 520px) {
+    .task-modal {
+        max-height: 100vh;
+        height: 100%;
+    }
+
+    .task-modal-footer {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .task-modal-footer-left,
+    .task-modal-footer-right {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .task-modal-btn {
+        flex: 1;
+        justify-content: center;
+    }
+}

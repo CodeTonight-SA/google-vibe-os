@@ -1,0 +1,93 @@
+{
+    "name": "googol-vibe",
+    "private": true,
+    "version": "1.0.0-beta.1",
+    "type": "commonjs",
+    "main": "electron/main.js",
+    "description": "Your Google Workspace, unified - ENTER Konsult",
+    "author": {
+        "name": "ENTER Konsult",
+        "email": "dev@codetonight.co.za"
+    },
+    "license": "UNLICENSED",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "lint": "eslint .",
+        "preview": "vite preview",
+        "electron:dev": "cross-env NODE_ENV=development electron .",
+        "electron:build": "vite build && electron-builder",
+        "build:mac": "vite build && electron-builder --mac",
+        "build:win": "vite build && electron-builder --win",
+        "build:linux": "vite build && electron-builder --linux",
+        "build:all": "vite build && electron-builder -mwl"
+    },
+    "dependencies": {
+        "@google-cloud/local-auth": "^3.0.1",
+        "@sentry/electron": "^5.0.0",
+        "electron-store": "^10.0.0",
+        "framer-motion": "^11.15.0",
+        "googleapis": "^169.0.0",
+        "lucide-react": "^0.468.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "rrule": "^2.8.1"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.17.0",
+        "@types/react": "^18.3.18",
+        "@types/react-dom": "^18.3.5",
+        "@vitejs/plugin-react": "^4.3.4",
+        "cross-env": "^10.1.0",
+        "electron": "^39.2.7",
+        "electron-builder": "^25.1.8",
+        "electron-squirrel-startup": "^1.0.1",
+        "eslint": "^9.17.0",
+        "eslint-plugin-react": "^7.37.2",
+        "eslint-plugin-react-hooks": "^5.0.0",
+        "eslint-plugin-react-refresh": "^0.4.16",
+        "globals": "^15.14.0",
+        "server-destroy": "^1.0.1",
+        "vite": "^6.0.5"
+    },
+    "build": {
+        "productName": "Googol Vibe",
+        "appId": "com.enterkonsult.googol-vibe",
+        "mac": {
+            "target": [
+                "dmg",
+                "zip"
+            ],
+            "category": "public.app-category.productivity",
+            "icon": "build/icon.icns"
+        },
+        "win": {
+            "target": [
+                "nsis",
+                "portable"
+            ],
+            "icon": "build/icon.ico"
+        },
+        "linux": {
+            "target": [
+                "AppImage",
+                "deb"
+            ],
+            "icon": "build/icon.png",
+            "category": "Utility"
+        },
+        "files": [
+            "dist/**/*",
+            "electron/**/*"
+        ],
+        "directories": {
+            "output": "release",
+            "buildResources": "build"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": true,
+            "allowToChangeInstallationDirectory": true
+        }
+    }
+}

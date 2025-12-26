@@ -1,0 +1,128 @@
+<svg width="960" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="terminal-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="600" fill="#fafafa"/>
+
+  <!-- Window Chrome -->
+  <rect x="0" y="0" width="960" height="600" rx="12" fill="#fafafa" stroke="#e5e7eb"/>
+  <rect x="0" y="0" width="960" height="36" rx="12" fill="#f3f4f6"/>
+  <rect x="0" y="24" width="960" height="12" fill="#f3f4f6"/>
+  <circle cx="20" cy="18" r="6" fill="#ef4444"/>
+  <circle cx="40" cy="18" r="6" fill="#fbbf24"/>
+  <circle cx="60" cy="18" r="6" fill="#22c55e"/>
+
+  <!-- Header -->
+  <text x="32" y="72" font-family="system-ui" font-size="11" fill="#ea580c" font-weight="500" letter-spacing="0.05em">WELCOME BACK</text>
+  <text x="32" y="100" font-family="system-ui" font-size="26" fill="#1a1a1a" font-weight="700">Googol Vibe</text>
+  <text x="32" y="122" font-family="system-ui" font-size="14" fill="#6b7280">Ready to work, <tspan font-weight="600" fill="#1a1a1a">User</tspan>.</text>
+
+  <!-- Avatar -->
+  <circle cx="890" cy="90" r="22" fill="#e5e7eb"/>
+  <rect x="840" y="78" width="60" height="24" rx="4" fill="#fff" stroke="#e5e7eb"/>
+  <text x="870" y="94" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6b7280">LOGOUT</text>
+
+  <!-- Divider -->
+  <line x1="32" y1="140" x2="928" y2="140" stroke="#e5e7eb"/>
+
+  <!-- INBOX Widget -->
+  <rect x="32" y="160" width="320" height="200" rx="8" fill="#fff" stroke="#e5e7eb"/>
+  <rect x="48" y="176" width="16" height="14" rx="2" fill="none" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="72" y="188" font-family="system-ui" font-size="12" fill="#1a1a1a" font-weight="600" letter-spacing="0.03em">INBOX</text>
+  <rect x="280" y="172" width="56" height="22" rx="4" fill="#1a1a1a"/>
+  <text x="308" y="187" text-anchor="middle" font-family="system-ui" font-size="10" fill="#fff" font-weight="500">10 NEW</text>
+
+  <!-- Email items -->
+  <text x="48" y="224" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Discord</text>
+  <text x="300" y="224" text-anchor="end" font-family="system-ui" font-size="11" fill="#9ca3af">14:19</text>
+  <text x="48" y="242" font-family="system-ui" font-size="12" fill="#9ca3af">Discord Payment Success</text>
+  <line x1="48" y1="256" x2="336" y2="256" stroke="#f3f4f6"/>
+
+  <text x="48" y="276" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Cole</text>
+  <text x="300" y="276" text-anchor="end" font-family="system-ui" font-size="11" fill="#9ca3af">11:17</text>
+  <text x="48" y="294" font-family="system-ui" font-size="12" fill="#9ca3af">Wow Your Visitors With Formspree</text>
+  <line x1="48" y1="308" x2="336" y2="308" stroke="#f3f4f6"/>
+
+  <text x="48" y="328" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">TLDR</text>
+  <text x="300" y="328" text-anchor="end" font-family="system-ui" font-size="11" fill="#9ca3af">13:48</text>
+  <text x="48" y="346" font-family="system-ui" font-size="12" fill="#9ca3af">Gmail address changes, ChatGPT...</text>
+
+  <!-- TASKS Widget -->
+  <rect x="368" y="160" width="280" height="200" rx="8" fill="#fff" stroke="#e5e7eb"/>
+  <rect x="384" y="176" width="16" height="16" rx="2" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="408" y="188" font-family="system-ui" font-size="12" fill="#1a1a1a" font-weight="600" letter-spacing="0.03em">TASKS</text>
+  <rect x="560" y="172" width="72" height="22" rx="4" fill="#1a1a1a"/>
+  <text x="596" y="187" text-anchor="middle" font-family="system-ui" font-size="10" fill="#fff" font-weight="500">1 PENDING</text>
+
+  <!-- Add task input -->
+  <rect x="384" y="210" width="216" height="36" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="400" y="233" font-family="system-ui" font-size="13" fill="#9ca3af">Add a task...</text>
+  <rect x="608" y="214" width="28" height="28" rx="6" fill="#ea580c"/>
+  <text x="622" y="233" text-anchor="middle" font-family="system-ui" font-size="18" fill="#fff">+</text>
+
+  <!-- Task item -->
+  <rect x="384" y="260" width="4" height="40" rx="2" fill="#ea580c"/>
+  <circle cx="404" cy="280" r="8" fill="none" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="424" y="276" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Daily TODO</text>
+  <text x="424" y="294" font-family="system-ui" font-size="11" fill="#9ca3af">26/12/2025</text>
+
+  <!-- VIBE TERMINAL -->
+  <rect x="664" y="160" width="264" height="420" rx="8" fill="url(#terminal-bg)"/>
+  <text x="700" y="188" font-family="ui-monospace, monospace" font-size="11" fill="#9ca3af">&gt;_</text>
+  <text x="720" y="188" font-family="system-ui" font-size="12" fill="#fff" font-weight="600" letter-spacing="0.03em">VIBE TERMINAL</text>
+  <text x="896" y="188" text-anchor="end" font-family="system-ui" font-size="10" fill="#22c55e" font-weight="500">ACTIVE</text>
+
+  <!-- Terminal content box -->
+  <rect x="680" y="210" width="232" height="70" rx="4" fill="#374151"/>
+  <rect x="680" y="210" width="4" height="70" fill="#ea580c"/>
+  <text x="696" y="232" font-family="ui-monospace, monospace" font-size="11" fill="#ea580c">&gt;</text>
+  <text x="710" y="232" font-family="ui-monospace, monospace" font-size="11" fill="#fff">VIBE TERMINAL v1.0</text>
+  <line x1="696" y1="244" x2="896" y2="244" stroke="#4b5563"/>
+  <text x="696" y="264" font-family="ui-monospace, monospace" font-size="11" fill="#9ca3af">Type /help for commands, or</text>
+  <text x="696" y="280" font-family="ui-monospace, monospace" font-size="11" fill="#9ca3af">ask anything.</text>
+
+  <!-- Terminal input -->
+  <rect x="680" y="520" width="200" height="36" rx="6" fill="#374151"/>
+  <text x="696" y="543" font-family="ui-monospace, monospace" font-size="11" fill="#6b7280">/help or ask anything...</text>
+  <rect x="888" y="524" width="28" height="28" rx="6" fill="#ea580c"/>
+  <polygon points="902,538 902,544 908,541" fill="#fff"/>
+
+  <!-- Quick commands -->
+  <text x="680" y="500" font-family="ui-monospace, monospace" font-size="10" fill="#6b7280" letter-spacing="0.05em">QUICK COMMANDS</text>
+
+  <!-- UP NEXT Widget -->
+  <rect x="32" y="376" width="320" height="140" rx="8" fill="#fff" stroke="#e5e7eb"/>
+  <rect x="48" y="392" width="16" height="14" rx="2" fill="none" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="72" y="404" font-family="system-ui" font-size="12" fill="#1a1a1a" font-weight="600" letter-spacing="0.03em">UP NEXT</text>
+
+  <text x="48" y="440" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Office</text>
+  <text x="48" y="458" font-family="system-ui" font-size="11" fill="#9ca3af">Fri 02:00</text>
+  <line x1="48" y1="472" x2="336" y2="472" stroke="#f3f4f6"/>
+  <text x="48" y="492" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Daily Development Session</text>
+  <text x="48" y="510" font-family="system-ui" font-size="11" fill="#9ca3af">Fri 16:30</text>
+
+  <!-- MEETINGS Widget -->
+  <rect x="368" y="376" width="280" height="140" rx="8" fill="#fff" stroke="#e5e7eb"/>
+  <rect x="384" y="392" width="16" height="14" rx="2" fill="none" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="408" y="404" font-family="system-ui" font-size="12" fill="#1a1a1a" font-weight="600" letter-spacing="0.03em">MEETINGS</text>
+  <rect x="548" y="388" width="84" height="22" rx="4" fill="#1a1a1a"/>
+  <text x="590" y="403" text-anchor="middle" font-family="system-ui" font-size="10" fill="#fff" font-weight="500">7 THIS WEEK</text>
+
+  <text x="384" y="440" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Daily Development &amp; Design</text>
+  <text x="384" y="458" font-family="system-ui" font-size="11" fill="#9ca3af">Fri 16:30 (6 attendees)</text>
+  <line x1="384" y1="472" x2="632" y2="472" stroke="#f3f4f6"/>
+  <text x="384" y="492" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Standup</text>
+  <text x="384" y="510" font-family="system-ui" font-size="11" fill="#9ca3af">Mon 09:30 (6 attendees)</text>
+
+  <!-- DOCUMENTS Widget -->
+  <rect x="32" y="532" width="616" height="52" rx="8" fill="#fff" stroke="#e5e7eb"/>
+  <rect x="48" y="548" width="16" height="14" rx="2" fill="none" stroke="#6b7280" stroke-width="1.5"/>
+  <text x="72" y="560" font-family="system-ui" font-size="12" fill="#1a1a1a" font-weight="600" letter-spacing="0.03em">DOCUMENTS</text>
+  <rect x="564" y="544" width="68" height="22" rx="4" fill="#1a1a1a"/>
+  <text x="598" y="559" text-anchor="middle" font-family="system-ui" font-size="10" fill="#fff" font-weight="500">12 TOTAL</text>
+</svg>

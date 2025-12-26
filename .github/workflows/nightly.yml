@@ -1,0 +1,95 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 2 AM UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            build_cmd: npm run build:mac
+            asset_path: dashboard/release/*.dmg
+          - os: windows-latest
+            build_cmd: npm run build:win
+            asset_path: dashboard/release/*Setup*.exe
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build
+        working-directory: dashboard
+        run: ${{ matrix.build_cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.os }}
+          path: ${{ matrix.asset_path }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-macos-latest
+          path: ./artifacts
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-windows-latest
+          path: ./artifacts
+
+      - name: Delete existing nightly release
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          tag_name: nightly
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          delete_release: true
+        continue-on-error: true
+
+      - name: Create Nightly Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly Build
+          body: |
+            ## Nightly Build
+
+            Automated build from the latest `main` branch.
+
+            **Warning:** This is an unstable development build. Use at your own risk.
+
+            Built: ${{ github.event.head_commit.timestamp || 'Manual trigger' }}
+            Commit: ${{ github.sha }}
+
+            ### Installation
+
+            **macOS:** If blocked, run `xattr -cr /Applications/Googol\ Vibe.app`
+          files: ./artifacts/*
+          prerelease: true
+          make_latest: false

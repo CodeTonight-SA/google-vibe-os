@@ -1,0 +1,18 @@
+{
+    "mcpServers": {
+        "gmail": {
+            "command": "${PROJECT_DIR}/google-mcp-servers/venv/bin/gmail",
+            "args": [],
+            "env": {
+                "GOOGLE_APPLICATION_CREDENTIALS": "${HOME}/.agent/secrets/credentials.json"
+            }
+        },
+        "calendar": {
+            "command": "${PROJECT_DIR}/google-mcp-servers/venv/bin/mcp-server-google-calendar",
+            "args": [],
+            "env": {
+                "GOOGLE_APPLICATION_CREDENTIALS": "${HOME}/.agent/secrets/credentials.json"
+            }
+        }
+    }
+}
