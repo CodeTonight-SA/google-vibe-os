@@ -1,13 +1,17 @@
 {
     "name": "googol-vibe",
     "private": true,
-    "version": "1.0.0-beta.1",
+    "version": "1.0.0",
     "type": "commonjs",
     "main": "electron/main.js",
     "description": "Your Google Workspace, unified - ENTER Konsult",
     "author": {
         "name": "ENTER Konsult",
         "email": "dev@codetonight.co.za"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/CodeTonight-SA/google-vibe-os"
     },
     "license": "UNLICENSED",
     "scripts": {
@@ -17,10 +21,10 @@
         "preview": "vite preview",
         "electron:dev": "cross-env NODE_ENV=development electron .",
         "electron:build": "vite build && electron-builder",
-        "build:mac": "vite build && electron-builder --mac",
-        "build:win": "vite build && electron-builder --win",
-        "build:linux": "vite build && electron-builder --linux",
-        "build:all": "vite build && electron-builder -mwl"
+        "build:mac": "vite build && electron-builder --mac -p never",
+        "build:win": "vite build && electron-builder --win -p never",
+        "build:linux": "vite build && electron-builder --linux -p never",
+        "build:all": "vite build && electron-builder -mwl -p never"
     },
     "dependencies": {
         "@google-cloud/local-auth": "^3.0.1",
