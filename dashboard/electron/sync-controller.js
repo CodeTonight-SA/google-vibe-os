@@ -12,16 +12,16 @@
 const { google } = require('googleapis');
 const notificationManager = require('./notification-manager');
 
-// Sync intervals (ms) - KISS: sensible defaults
+// Sync intervals (ms) - Aggressive polling for real-time feel
 const SYNC_INTERVALS = {
-    gmail: 5 * 60 * 1000,      // 5 minutes (most time-sensitive)
-    calendar: 15 * 60 * 1000,  // 15 minutes
-    tasks: 15 * 60 * 1000,     // 15 minutes
-    drive: 30 * 60 * 1000      // 30 minutes (least time-sensitive)
+    gmail: 30 * 1000,     // 30 seconds - emails are critical
+    calendar: 60 * 1000,  // 1 minute
+    tasks: 60 * 1000,     // 1 minute
+    drive: 2 * 60 * 1000  // 2 minutes
 };
 
 // Initial delay before first sync (ms)
-const INITIAL_DELAY = 10 * 1000; // 10 seconds after app ready
+const INITIAL_DELAY = 3 * 1000; // 3 seconds after app ready
 
 /**
  * Safe logging - prevents EPIPE crashes
@@ -143,7 +143,7 @@ class SyncController {
             SYNC_INTERVALS.drive
         );
 
-        log('Started - Gmail: 5m, Calendar: 15m, Tasks: 15m, Drive: 30m');
+        log('Started - Gmail: 30s, Calendar: 1m, Tasks: 1m, Drive: 2m');
     }
 
     /**
