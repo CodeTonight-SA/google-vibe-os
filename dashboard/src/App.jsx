@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Sparkles, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink } from 'lucide-react';
+import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Sparkles, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AgentPanel from './components/AgentPanel';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -66,6 +66,8 @@ function App() {
     const [currentDoc, setCurrentDoc] = useState(null); // { id, type } for edit button
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [onboardingChecked, setOnboardingChecked] = useState(false);
+    const [syncStatus, setSyncStatus] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -201,11 +203,50 @@ function App() {
                     setTasks(taskData.tasks || []);
                 });
             });
+
+            // Listen for sync events
+            window.electronAPI.onSyncComplete((status) => {
+                setSyncStatus(status);
+                setIsSyncing(false);
+            });
+
+            window.electronAPI.onGmailSynced((data) => {
+                if (data.count > 0) {
+                    // Refresh emails when new ones arrive
+                    window.electronAPI.getGmail().then(emailData => {
+                        setEmails(Array.isArray(emailData) ? emailData : []);
+                    });
+                }
+            });
+
+            window.electronAPI.onCalendarSynced(() => {
+                // Refresh calendar
+                window.electronAPI.getCalendar().then(data => {
+                    setEvents(Array.isArray(data) ? data : []);
+                });
+            });
+
+            window.electronAPI.onTasksSynced(() => {
+                // Refresh tasks
+                window.electronAPI.getTasks().then(data => {
+                    setTasks(data.tasks || []);
+                });
+            });
+
+            // Get initial sync status
+            window.electronAPI.getSyncStatus().then(status => {
+                setSyncStatus(status);
+            }).catch(() => {});
         }
 
         return () => {
-            if (window.electronAPI && window.electronAPI.removeContentListeners) {
-                window.electronAPI.removeContentListeners();
+            if (window.electronAPI) {
+                if (window.electronAPI.removeContentListeners) {
+                    window.electronAPI.removeContentListeners();
+                }
+                if (window.electronAPI.removeSyncListeners) {
+                    window.electronAPI.removeSyncListeners();
+                }
             }
         };
     }, []);
@@ -295,7 +336,14 @@ function App() {
     };
 
     const handleAddTask = async () => {
-        if (!newTaskTitle.trim() || !taskListId) return;
+        if (!taskListId) return;
+
+        if (!newTaskTitle.trim()) {
+            // Focus the text title input
+            document.getElementById('task-title-input').focus();
+            return;
+        }
+
         try {
             const newTask = await window.electronAPI.createTask(taskListId, newTaskTitle.trim(), null);
             setNewTaskTitle('');
@@ -508,6 +556,46 @@ function App() {
 
                     {isAuthenticated && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            {/* Sync Status Indicator */}
+                            <div
+                                onClick={async () => {
+                                    if (isSyncing) return;
+                                    setIsSyncing(true);
+                                    try {
+                                        const status = await window.electronAPI.forceSync('all');
+                                        setSyncStatus(status);
+                                    } catch (e) {
+                                        console.error('Force sync failed', e);
+                                    }
+                                    setIsSyncing(false);
+                                }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    cursor: 'pointer',
+                                    padding: '6px 10px',
+                                    background: isSyncing ? '#f3f4f6' : 'transparent',
+                                    border: '1px solid #e5e7eb',
+                                    transition: 'all 0.2s'
+                                }}
+                                title={syncStatus?.gmail?.lastSync ? `Last sync: ${new Date(syncStatus.gmail.lastSync).toLocaleTimeString()}` : 'Click to sync'}
+                            >
+                                <Radio
+                                    size={14}
+                                    color={isSyncing ? '#ea580c' : '#22c55e'}
+                                    className={isSyncing ? 'sync-pulse' : ''}
+                                />
+                                <span style={{
+                                    fontFamily: 'ui-monospace, "SF Mono", monospace',
+                                    fontSize: '0.625rem',
+                                    color: '#6b7280',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em'
+                                }}>
+                                    {isSyncing ? 'Syncing...' : 'Live'}
+                                </span>
+                            </div>
                             {profile && <img src={profile.picture} alt="Profile" referrerPolicy="no-referrer" style={{ width: 44, height: 44, borderRadius: 0, border: '1px solid #d1d5db' }} />}
                             <button
                                 onClick={handleLogout}
@@ -533,367 +621,367 @@ function App() {
             )}
 
             {!contentViewOpen && (
-            <div className="grid">
-                {/* Main Content Area (9 Columns) */}
-                <div className="col-span-9">
-                    <div className="grid" style={{ gap: '24px' }}>
-                        {/* Mail Widget */}
-                        <div className="col-span-7">
-                            <motion.div
-                                className="card"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5 }}>
-                                <div className="card-header">
-                                    <div className="card-title">
-                                        <Mail color="#ea580c" size={18} /> Inbox
+                <div className="grid">
+                    {/* Main Content Area (9 Columns) */}
+                    <div className="col-span-9">
+                        <div className="grid" style={{ gap: '24px' }}>
+                            {/* Mail Widget */}
+                            <div className="col-span-7">
+                                <motion.div
+                                    className="card"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5 }}>
+                                    <div className="card-header">
+                                        <div className="card-title">
+                                            <Mail color="#ea580c" size={18} /> Inbox
+                                        </div>
+                                        <span className="badge">{emails.length} New</span>
                                     </div>
-                                    <span className="badge">{emails.length} New</span>
-                                </div>
-                                <div className="widget-scroll">
-                                    {loadingStates.emails ? (
-                                        <>
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                        </>
-                                    ) : emails.length > 0 ? (
-                                        emails.map(email => (
-                                            <div
-                                                key={email.id}
-                                                className="list-item"
-                                                onClick={() => handleViewContent(`https://mail.google.com/mail/u/0/#inbox/${email.id}`, 'email')}
-                                            >
-                                                <div className="list-content">
-                                                    <div className="item-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <span>{email.from.split('<')[0].replace(/"/g, '')}</span>
-                                                        <span style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'ui-monospace, "SF Mono", monospace' }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <div className="widget-scroll">
+                                        {loadingStates.emails ? (
+                                            <>
+                                                <SkeletonListItem />
+                                                <SkeletonListItem />
+                                                <SkeletonListItem />
+                                                <SkeletonListItem />
+                                            </>
+                                        ) : emails.length > 0 ? (
+                                            emails.map(email => (
+                                                <div
+                                                    key={email.id}
+                                                    className="list-item"
+                                                    onClick={() => handleViewContent(`https://mail.google.com/mail/u/0/#inbox/${email.id}`, 'email')}
+                                                >
+                                                    <div className="list-content">
+                                                        <div className="item-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <span>{email.from.split('<')[0].replace(/"/g, '')}</span>
+                                                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'ui-monospace, "SF Mono", monospace' }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        </div>
+                                                        <div className="item-sub">{email.subject}</div>
                                                     </div>
-                                                    <div className="item-sub">{email.subject}</div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No new emails</div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        {/* Tasks Widget */}
-                        <div className="col-span-5">
-                            <motion.div
-                                className="card"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.05 }}
-                            >
-                                <div className="card-header">
-                                    <div
-                                        className="card-title"
-                                        onClick={() => handleViewContent('https://tasks.google.com/', 'tasks')}
-                                        style={{ cursor: 'pointer' }}
-                                        title="Open Google Tasks"
-                                    >
-                                        <CheckSquare color="#ea580c" size={18} /> Tasks
-                                        <ExternalLink size={14} style={{ marginLeft: 6, opacity: 0.5 }} />
-                                        {loadingStates.tasks && (
-                                            <div className="task-loading-indicator">
-                                                <div className="task-loading-dot" />
-                                                Loading
-                                            </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No new emails</div>
                                         )}
                                     </div>
-                                    <span className="badge">{tasks.length} Pending</span>
-                                </div>
-                                <div>
-                                    {/* Add Task Input */}
-                                    <div style={{ display: 'flex', gap: 8, padding: '12px 0', borderBottom: '1px solid #e5e7eb' }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Add a task..."
-                                            value={newTaskTitle}
-                                            onChange={(e) => setNewTaskTitle(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                                            style={{
-                                                flex: 1,
-                                                border: '1px solid #d1d5db',
-                                                padding: '8px 12px',
-                                                fontSize: '0.875rem',
-                                                outline: 'none',
-                                                fontFamily: 'inherit'
-                                            }}
-                                        />
-                                        <button
-                                            onClick={handleAddTask}
-                                            style={{
-                                                background: '#ea580c',
-                                                color: 'white',
-                                                border: 'none',
-                                                padding: '8px 12px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                            }}
+                                </motion.div>
+                            </div>
+
+                            {/* Tasks Widget */}
+                            <div className="col-span-5">
+                                <motion.div
+                                    className="card"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.05 }}
+                                >
+                                    <div className="card-header">
+                                        <div
+                                            className="card-title"
+                                            onClick={() => handleViewContent('https://tasks.google.com/', 'tasks')}
+                                            style={{ cursor: 'pointer' }}
+                                            title="Open Google Tasks"
                                         >
-                                            <Plus size={16} />
-                                        </button>
+                                            <CheckSquare color="#ea580c" size={18} /> Tasks
+                                            <ExternalLink size={14} style={{ marginLeft: 6, opacity: 0.5 }} />
+                                            {loadingStates.tasks && (
+                                                <div className="task-loading-indicator">
+                                                    <div className="task-loading-dot" />
+                                                    Loading
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="badge">{tasks.length} Pending</span>
                                     </div>
-                                    {/* Task List - Click to open detail modal */}
+                                    <div>
+                                        {/* Add Task Input */}
+                                        <div id="task-title-input" style={{ display: 'flex', gap: 8, padding: '12px 0', borderBottom: '1px solid #e5e7eb' }}>
+                                            <input
+                                                type="text"
+                                                placeholder="Enter task title..."
+                                                value={newTaskTitle}
+                                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                                                style={{
+                                                    flex: 1,
+                                                    border: '1px solid #d1d5db',
+                                                    padding: '8px 12px',
+                                                    fontSize: '0.875rem',
+                                                    outline: 'none',
+                                                    fontFamily: 'inherit'
+                                                }}
+                                            />
+                                            <button
+                                                onClick={handleAddTask}
+                                                style={{
+                                                    background: '#ea580c',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '8px 12px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        {/* Task List - Click to open detail modal */}
+                                        <div className="widget-scroll-sm">
+                                            {loadingStates.tasks ? (
+                                                <>
+                                                    <SkeletonListItem />
+                                                    <SkeletonListItem />
+                                                    <SkeletonListItem />
+                                                </>
+                                            ) : tasks.length > 0 ? (
+                                                tasks.map((task) => {
+                                                    const isRecurring = Boolean(getRecurrenceForTask(task));
+                                                    return (
+                                                        <div
+                                                            key={task.id}
+                                                            className={`list-item task-item-clickable ${isRecurring ? 'task-recurring' : ''}`}
+                                                            onClick={() => handleOpenTaskModal(task)}
+                                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                                                        >
+                                                            <div className="list-content" style={{ flex: 1 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                    {isRecurring && (
+                                                                        <span className="task-recurring-icon">
+                                                                            <RefreshCw size={12} />
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="task-item-title">{task.title}</span>
+                                                                    {task.notes && (
+                                                                        <span className="task-item-has-notes">
+                                                                            <StickyNote size={12} />
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {task.due && (
+                                                                    <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                        <Clock size={12} />
+                                                                        {new Date(task.due).toLocaleDateString()}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No pending tasks</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            </div>
+
+                            {/* Calendar Widget */}
+                            <div className="col-span-6">
+                                <motion.div
+                                    className="card"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.1 }}
+                                >
+                                    <div className="card-header">
+                                        <div className="card-title">
+                                            <Calendar color="#ea580c" size={18} /> Up Next
+                                        </div>
+                                    </div>
                                     <div className="widget-scroll-sm">
-                                        {loadingStates.tasks ? (
+                                        {loadingStates.events ? (
                                             <>
                                                 <SkeletonListItem />
                                                 <SkeletonListItem />
                                                 <SkeletonListItem />
                                             </>
-                                        ) : tasks.length > 0 ? (
-                                            tasks.map((task) => {
-                                                const isRecurring = Boolean(getRecurrenceForTask(task));
+                                        ) : events.length > 0 ? (
+                                            events.map((event, i) => {
+                                                const isMeet = event.htmlLink && event.htmlLink.includes('meet');
                                                 return (
                                                     <div
-                                                        key={task.id}
-                                                        className={`list-item task-item-clickable ${isRecurring ? 'task-recurring' : ''}`}
-                                                        onClick={() => handleOpenTaskModal(task)}
-                                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                                                        key={i}
+                                                        className="list-item"
+                                                        onClick={() => handleViewContent(event.htmlLink, isMeet ? 'meet' : 'calendar')}
                                                     >
-                                                        <div className="list-content" style={{ flex: 1 }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                                {isRecurring && (
-                                                                    <span className="task-recurring-icon">
-                                                                        <RefreshCw size={12} />
-                                                                    </span>
-                                                                )}
-                                                                <span className="task-item-title">{task.title}</span>
-                                                                {task.notes && (
-                                                                    <span className="task-item-has-notes">
-                                                                        <StickyNote size={12} />
-                                                                    </span>
-                                                                )}
+                                                        <div className="list-content">
+                                                            <div className="item-title">{event.summary}</div>
+                                                            <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                <Clock size={12} />
+                                                                {event.start && new Date(event.start).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
                                                             </div>
-                                                            {task.due && (
-                                                                <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                    <Clock size={12} />
-                                                                    {new Date(task.due).toLocaleDateString()}
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 );
                                             })
                                         ) : (
-                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No pending tasks</div>
+                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No upcoming events</div>
                                         )}
                                     </div>
-                                </div>
-                            </motion.div>
-                        </div>
+                                </motion.div>
+                            </div>
 
-                        {/* Calendar Widget */}
-                        <div className="col-span-6">
-                            <motion.div
-                                className="card"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.1 }}
-                            >
-                                <div className="card-header">
-                                    <div className="card-title">
-                                        <Calendar color="#ea580c" size={18} /> Up Next
+                            {/* Meetings Widget */}
+                            <div className="col-span-6">
+                                <motion.div
+                                    className="card"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.15 }}
+                                >
+                                    <div className="card-header">
+                                        <div className="card-title">
+                                            <Video color="#ea580c" size={18} /> Meetings
+                                        </div>
+                                        <span className="badge">{meetings.length} This Week</span>
                                     </div>
-                                </div>
-                                <div className="widget-scroll-sm">
-                                    {loadingStates.events ? (
-                                        <>
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                        </>
-                                    ) : events.length > 0 ? (
-                                        events.map((event, i) => {
-                                            const isMeet = event.htmlLink && event.htmlLink.includes('meet');
-                                            return (
+                                    <div className="widget-scroll-sm">
+                                        {loadingStates.meetings ? (
+                                            <>
+                                                <SkeletonListItem />
+                                                <SkeletonListItem />
+                                                <SkeletonListItem />
+                                            </>
+                                        ) : meetings.length > 0 ? (
+                                            meetings.slice(0, 5).map((meeting) => (
                                                 <div
-                                                    key={i}
+                                                    key={meeting.id}
                                                     className="list-item"
-                                                    onClick={() => handleViewContent(event.htmlLink, isMeet ? 'meet' : 'calendar')}
+                                                    onClick={() => handleViewContent(meeting.meetLink, 'meet')}
                                                 >
                                                     <div className="list-content">
-                                                        <div className="item-title">{event.summary}</div>
+                                                        <div className="item-title">{meeting.summary}</div>
                                                         <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                             <Clock size={12} />
-                                                            {event.start && new Date(event.start).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                            {new Date(meeting.start).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                            {meeting.attendees > 0 && <span style={{ marginLeft: 8 }}>({meeting.attendees} attendees)</span>}
                                                         </div>
                                                     </div>
                                                 </div>
-                                            );
-                                        })
-                                    ) : (
-                                        <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No upcoming events</div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        {/* Meetings Widget */}
-                        <div className="col-span-6">
-                            <motion.div
-                                className="card"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.15 }}
-                            >
-                                <div className="card-header">
-                                    <div className="card-title">
-                                        <Video color="#ea580c" size={18} /> Meetings
+                                            ))
+                                        ) : (
+                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No meetings scheduled</div>
+                                        )}
                                     </div>
-                                    <span className="badge">{meetings.length} This Week</span>
-                                </div>
-                                <div className="widget-scroll-sm">
-                                    {loadingStates.meetings ? (
-                                        <>
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                            <SkeletonListItem />
-                                        </>
-                                    ) : meetings.length > 0 ? (
-                                        meetings.slice(0, 5).map((meeting) => (
-                                            <div
-                                                key={meeting.id}
-                                                className="list-item"
-                                                onClick={() => handleViewContent(meeting.meetLink, 'meet')}
-                                            >
-                                                <div className="list-content">
-                                                    <div className="item-title">{meeting.summary}</div>
-                                                    <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <Clock size={12} />
-                                                        {new Date(meeting.start).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                        {meeting.attendees > 0 && <span style={{ marginLeft: 8 }}>({meeting.attendees} attendees)</span>}
+                                </motion.div>
+                            </div>
+
+                            {/* Documents Widget - Horizontal Scroll Cards */}
+                            <div className="col-span-12">
+                                <motion.div
+                                    className="card"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.2 }}
+                                >
+                                    <div className="card-header">
+                                        <div className="card-title">
+                                            <FileText color="#ea580c" size={18} /> Documents
+                                        </div>
+                                        <span className="badge">{documents.length} Total</span>
+                                    </div>
+                                    <div className="doc-scroll">
+                                        {loadingStates.documents ? (
+                                            <>
+                                                <SkeletonDocCard />
+                                                <SkeletonDocCard />
+                                                <SkeletonDocCard />
+                                                <SkeletonDocCard />
+                                            </>
+                                        ) : documents.length > 0 ? (
+                                            documents.slice(0, 8).map((doc) => (
+                                                <div
+                                                    key={doc.id}
+                                                    className="doc-card"
+                                                    onClick={() => handleViewContent(
+                                                        getPreviewUrl(doc.id, doc.mimeType),
+                                                        'document',
+                                                        { id: doc.id, type: getDocType(doc.mimeType) }
+                                                    )}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        {getDocIcon(doc.mimeType)}
+                                                        <span style={{ fontSize: '0.7rem', color: '#6b7280', fontFamily: 'ui-monospace', textTransform: 'uppercase' }}>
+                                                            {getDocType(doc.mimeType)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="item-title-truncate">{doc.name}</div>
+                                                    <div className="item-sub" style={{ marginTop: 4 }}>
+                                                        {doc.modifiedTime && new Date(doc.modifiedTime).toLocaleDateString()}
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No meetings scheduled</div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        {/* Documents Widget - Horizontal Scroll Cards */}
-                        <div className="col-span-12">
-                            <motion.div
-                                className="card"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.2 }}
-                            >
-                                <div className="card-header">
-                                    <div className="card-title">
-                                        <FileText color="#ea580c" size={18} /> Documents
+                                            ))
+                                        ) : (
+                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20, width: '100%' }}>No documents</div>
+                                        )}
                                     </div>
-                                    <span className="badge">{documents.length} Total</span>
-                                </div>
-                                <div className="doc-scroll">
-                                    {loadingStates.documents ? (
-                                        <>
-                                            <SkeletonDocCard />
-                                            <SkeletonDocCard />
-                                            <SkeletonDocCard />
-                                            <SkeletonDocCard />
-                                        </>
-                                    ) : documents.length > 0 ? (
-                                        documents.slice(0, 8).map((doc) => (
-                                            <div
-                                                key={doc.id}
-                                                className="doc-card"
-                                                onClick={() => handleViewContent(
-                                                    getPreviewUrl(doc.id, doc.mimeType),
-                                                    'document',
-                                                    { id: doc.id, type: getDocType(doc.mimeType) }
-                                                )}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    {getDocIcon(doc.mimeType)}
-                                                    <span style={{ fontSize: '0.7rem', color: '#6b7280', fontFamily: 'ui-monospace', textTransform: 'uppercase' }}>
-                                                        {getDocType(doc.mimeType)}
-                                                    </span>
-                                                </div>
-                                                <div className="item-title-truncate">{doc.name}</div>
-                                                <div className="item-sub" style={{ marginTop: 4 }}>
-                                                    {doc.modifiedTime && new Date(doc.modifiedTime).toLocaleDateString()}
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div style={{ color: '#6b7280', textAlign: 'center', padding: 20, width: '100%' }}>No documents</div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        </div>
+                                </motion.div>
+                            </div>
 
-                        {/* Files Widget */}
-                        <div className="col-span-12">
-                            <motion.div
-                                className="card"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: 0.3 }}
-                            >
-                                <div className="card-header">
-                                    <div className="card-title">
-                                        <HardDrive color="#ea580c" size={18} /> Recent Files
+                            {/* Files Widget */}
+                            <div className="col-span-12">
+                                <motion.div
+                                    className="card"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.3 }}
+                                >
+                                    <div className="card-header">
+                                        <div className="card-title">
+                                            <HardDrive color="#ea580c" size={18} /> Recent Files
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="file-grid">
-                                    {loadingStates.files ? (
-                                        <>
-                                            <SkeletonFileCard />
-                                            <SkeletonFileCard />
-                                            <SkeletonFileCard />
-                                            <SkeletonFileCard />
-                                            <SkeletonFileCard />
-                                            <SkeletonFileCard />
-                                        </>
-                                    ) : files.length > 0 ? (
-                                        files.slice(0, 6).map(file => (
-                                            <div
-                                                key={file.id}
-                                                className="file-card"
-                                                style={{ cursor: 'pointer' }}
-                                                onClick={() => handleViewContent(file.webViewLink, 'file')}
-                                            >
-                                                <div style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: 8, overflow: 'hidden', width: '100%', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a1a' }}>{file.name}</div>
-                                                {file.thumbnailLink ? (
-                                                    <img src={file.thumbnailLink} className="file-thumb" alt={file.name} referrerPolicy="no-referrer" />
-                                                ) : (
-                                                    <div className="file-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <FileText color="#9ca3af" size={32} />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No accessible files</div>
-                                    )}
-                                </div>
-                            </motion.div>
+                                    <div className="file-grid">
+                                        {loadingStates.files ? (
+                                            <>
+                                                <SkeletonFileCard />
+                                                <SkeletonFileCard />
+                                                <SkeletonFileCard />
+                                                <SkeletonFileCard />
+                                                <SkeletonFileCard />
+                                                <SkeletonFileCard />
+                                            </>
+                                        ) : files.length > 0 ? (
+                                            files.slice(0, 6).map(file => (
+                                                <div
+                                                    key={file.id}
+                                                    className="file-card"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={() => handleViewContent(file.webViewLink, 'file')}
+                                                >
+                                                    <div style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: 8, overflow: 'hidden', width: '100%', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a1a' }}>{file.name}</div>
+                                                    {file.thumbnailLink ? (
+                                                        <img src={file.thumbnailLink} className="file-thumb" alt={file.name} referrerPolicy="no-referrer" />
+                                                    ) : (
+                                                        <div className="file-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <FileText color="#9ca3af" size={32} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No accessible files</div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Agent Sidebar (3 Columns) */}
-                <div className="col-span-3">
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.6 }}
-                    >
-                        <AgentPanel />
-                    </motion.div>
+                    {/* Agent Sidebar (3 Columns) */}
+                    <div className="col-span-3">
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.6 }}
+                        >
+                            <AgentPanel />
+                        </motion.div>
+                    </div>
                 </div>
-            </div>
             )}
 
             {/* Task Detail Modal */}

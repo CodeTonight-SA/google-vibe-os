@@ -8,6 +8,7 @@ const configManager = require('./config-manager');
 const telemetry = require('./telemetry');
 const recurrenceManager = require('./recurrence-manager');
 const notificationManager = require('./notification-manager');
+const syncController = require('./sync-controller');
 
 // Handle EPIPE errors gracefully - occurs when stdout/stderr pipe closes
 process.stdout?.on?.('error', (err) => {
@@ -246,96 +247,24 @@ function stopRecurrenceScheduler() {
 }
 
 // ========================================
-// Notification Scheduler
+// Background Sync Controller
 // ========================================
 
-let notificationInterval = null;
+async function startSyncController() {
+    // Load auth if available
+    if (!authClient) authClient = await loadSavedCredentialsIfExist();
 
-async function syncNotificationReminders() {
-    try {
-        if (!authClient) authClient = await loadSavedCredentialsIfExist();
-        if (!authClient) {
-            console.log('[Notifications] No auth client, skipping sync');
-            return;
-        }
-
-        console.log('[Notifications] Syncing reminders...');
-
-        // Fetch tasks with due dates
-        const tasksApi = google.tasks({ version: 'v1', auth: authClient });
-        const lists = await tasksApi.tasklists.list({ maxResults: 1 });
-        if (lists.data.items?.length) {
-            const taskListId = lists.data.items[0].id;
-            const tasksRes = await tasksApi.tasks.list({
-                tasklist: taskListId,
-                maxResults: 50,
-                showCompleted: false
-            });
-            const tasks = (tasksRes.data.items || []).filter(t => t.due);
-            if (tasks.length > 0) {
-                notificationManager.scheduleTaskReminders(tasks);
-                console.log(`[Notifications] Scheduled ${tasks.length} task reminders`);
-            }
-        }
-
-        // Fetch upcoming calendar events
-        const calendar = google.calendar({ version: 'v3', auth: authClient });
-        const now = new Date();
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const eventsRes = await calendar.events.list({
-            calendarId: 'primary',
-            timeMin: now.toISOString(),
-            timeMax: tomorrow.toISOString(),
-            maxResults: 20,
-            singleEvents: true,
-            orderBy: 'startTime'
-        });
-
-        const events = eventsRes.data.items || [];
-        if (events.length > 0) {
-            // Schedule calendar reminders
-            notificationManager.scheduleCalendarReminders(events);
-
-            // Schedule meeting reminders (events with Meet links)
-            const meetings = events.filter(e =>
-                e.conferenceData?.entryPoints?.some(ep => ep.entryPointType === 'video')
-            ).map(event => ({
-                id: event.id,
-                summary: event.summary || 'Untitled Meeting',
-                start: event.start.dateTime || event.start.date,
-                meetLink: event.conferenceData?.entryPoints?.find(ep => ep.entryPointType === 'video')?.uri
-            }));
-
-            if (meetings.length > 0) {
-                notificationManager.scheduleMeetingReminders(meetings);
-                console.log(`[Notifications] Scheduled ${meetings.length} meeting reminders`);
-            }
-
-            console.log(`[Notifications] Scheduled ${events.length} calendar reminders`);
-        }
-
-    } catch (e) {
-        console.error('[Notifications] Sync error:', e.message);
+    if (authClient) {
+        syncController.init(authClient, mainWindow);
+        syncController.start();
+        console.log('[SyncController] Started background sync');
+    } else {
+        console.log('[SyncController] No auth client, will start after login');
     }
 }
 
-function startNotificationScheduler() {
-    // Initial sync after 10 seconds (give time for auth)
-    setTimeout(() => syncNotificationReminders(), 10000);
-
-    // Sync every 15 minutes
-    notificationInterval = setInterval(() => {
-        syncNotificationReminders();
-    }, 15 * 60 * 1000);
-
-    console.log('[Notifications] Scheduler started (15-min sync)');
-}
-
-function stopNotificationScheduler() {
-    if (notificationInterval) {
-        clearInterval(notificationInterval);
-        notificationInterval = null;
-    }
+function stopSyncController() {
+    syncController.stop();
     notificationManager.cancelAll();
 }
 
@@ -424,8 +353,8 @@ app.on('ready', () => {
     // Start recurrence scheduler (checks every hour)
     startRecurrenceScheduler();
 
-    // Start notification scheduler (syncs reminders every 15 min)
-    startNotificationScheduler();
+    // Start background sync controller (Gmail 5m, Calendar 15m, Tasks 15m, Drive 30m)
+    startSyncController();
 
     // ========================================
     // Onboarding IPC Handlers
@@ -514,8 +443,10 @@ app.on('ready', () => {
                 configManager.updateOnboarding({ onboardingComplete: true });
             }
 
-            // Sync notification reminders after login
-            setTimeout(() => syncNotificationReminders(), 2000);
+            // Start sync controller after login
+            syncController.setAuthClient(authClient);
+            syncController.setMainWindow(mainWindow);
+            syncController.start();
 
             return { success: true };
         } catch (error) {
@@ -834,8 +765,26 @@ app.on('ready', () => {
     });
 
     ipcMain.handle('sync-notification-reminders', async () => {
-        await syncNotificationReminders();
+        await syncController.syncAll();
         return { success: true, scheduled: notificationManager.getScheduled().length };
+    });
+
+    // ========================================
+    // Sync Controller IPC Handlers
+    // ========================================
+
+    ipcMain.handle('get-sync-status', async () => {
+        return syncController.getStatus();
+    });
+
+    ipcMain.handle('force-sync', async (event, { service }) => {
+        await syncController.forceSync(service || 'all');
+        return syncController.getStatus();
+    });
+
+    ipcMain.handle('reset-new-item-counts', async () => {
+        syncController.resetNewItemCounts();
+        return { success: true };
     });
 
     // ========================================
@@ -1092,7 +1041,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     // Clean up schedulers
     stopRecurrenceScheduler();
-    stopNotificationScheduler();
+    stopSyncController();
 });
 
 app.on('activate', () => {

@@ -82,6 +82,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     syncNotificationReminders: () => ipcRenderer.invoke('sync-notification-reminders'),
 
     // ========================================
+    // Background Sync Controller
+    // ========================================
+    getSyncStatus: () => ipcRenderer.invoke('get-sync-status'),
+    forceSync: (service) => ipcRenderer.invoke('force-sync', { service }),
+    resetNewItemCounts: () => ipcRenderer.invoke('reset-new-item-counts'),
+    onSyncComplete: (callback) => ipcRenderer.on('sync-complete', (event, data) => callback(data)),
+    onGmailSynced: (callback) => ipcRenderer.on('gmail-synced', (event, data) => callback(data)),
+    onCalendarSynced: (callback) => ipcRenderer.on('calendar-synced', (event, data) => callback(data)),
+    onTasksSynced: (callback) => ipcRenderer.on('tasks-synced', (event, data) => callback(data)),
+    onDriveSynced: (callback) => ipcRenderer.on('drive-synced', (event, data) => callback(data)),
+    removeSyncListeners: () => {
+        ipcRenderer.removeAllListeners('sync-complete');
+        ipcRenderer.removeAllListeners('gmail-synced');
+        ipcRenderer.removeAllListeners('calendar-synced');
+        ipcRenderer.removeAllListeners('tasks-synced');
+        ipcRenderer.removeAllListeners('drive-synced');
+    },
+
+    // ========================================
     // Event Listeners
     // ========================================
     onContentOpened: (callback) => ipcRenderer.on('content-view-opened', () => callback()),

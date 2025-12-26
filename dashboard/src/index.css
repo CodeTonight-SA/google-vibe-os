@@ -314,6 +314,16 @@ body {
     50% { opacity: 1; }
 }
 
+/* Sync Status Indicator */
+.sync-pulse {
+    animation: sync-blink 1s ease-in-out infinite;
+}
+
+@keyframes sync-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
 /* Skeleton Loader - Swiss Nihilism */
 .skeleton {
     background: linear-gradient(
