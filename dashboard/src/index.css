@@ -8,7 +8,7 @@
     --text-secondary: #666666;
     --accent-primary: #000000;
     --accent-secondary: #000000;
-    --border-color: #000000;
+    --border-color: #1a1a1a;
     --muted: #888888;
     --dark: #000000;
     --shadow-sm: none;
@@ -45,7 +45,7 @@ body {
     justify-content: space-between;
     align-items: flex-end;
     padding-bottom: 24px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .header-content h1 {
@@ -221,12 +221,12 @@ body {
     }
 }
 
-/* Cards - Swiss Nihilism */
+/* Cards - Swiss Nihilism (Softened) */
 .card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-left: 3px solid var(--accent-primary);
-    border-radius: 0;
+    border-left: 2px solid var(--accent-primary);
+    border-radius: 2px;
     padding: 32px;
     transition: box-shadow 0.2s ease;
     height: 100%;
@@ -267,7 +267,7 @@ body {
     margin-bottom: 0;
     background: transparent;
     border: none;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid #e5e7eb;
     transition: background 0.2s;
     cursor: pointer;
 }
@@ -466,7 +466,7 @@ body {
     background: var(--text-heading);
     color: #ffffff;
     padding: 1rem 2rem;
-    border-radius: 0;
+    border-radius: 2px;
     border: none;
     font-family: var(--font-mono);
     font-size: 0.75rem;
@@ -485,7 +485,7 @@ body {
     border: 1px solid var(--text-heading);
     color: var(--text-heading);
     padding: 1rem 2rem;
-    border-radius: 0;
+    border-radius: 2px;
     font-family: var(--font-mono);
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -1384,7 +1384,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;

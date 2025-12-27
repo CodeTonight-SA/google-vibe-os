@@ -654,11 +654,14 @@ function App() {
                                                     onClick={() => handleViewContent(`https://mail.google.com/mail/u/0/#inbox/${email.id}`, 'email')}
                                                 >
                                                     <div className="list-content">
-                                                        <div className="item-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                            <span>{email.from.split('<')[0].replace(/"/g, '')}</span>
-                                                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'ui-monospace, "SF Mono", monospace' }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        <div className="item-title" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: email.unread ? 700 : 600 }}>
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                {email.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
+                                                                {email.from.split('<')[0].replace(/"/g, '')}
+                                                            </span>
+                                                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'ui-monospace, "SF Mono", monospace', fontWeight: 400 }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         </div>
-                                                        <div className="item-sub">{email.subject}</div>
+                                                        <div className="item-sub" style={{ fontWeight: email.unread ? 600 : 400 }}>{email.subject}</div>
                                                     </div>
                                                 </div>
                                             ))
@@ -778,54 +781,8 @@ function App() {
                                 </motion.div>
                             </div>
 
-                            {/* Calendar Widget */}
-                            <div className="col-span-6">
-                                <motion.div
-                                    className="card"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.5, delay: 0.1 }}
-                                >
-                                    <div className="card-header">
-                                        <div className="card-title">
-                                            <Calendar color="#ea580c" size={18} /> Up Next
-                                        </div>
-                                    </div>
-                                    <div className="widget-scroll-sm">
-                                        {loadingStates.events ? (
-                                            <>
-                                                <SkeletonListItem />
-                                                <SkeletonListItem />
-                                                <SkeletonListItem />
-                                            </>
-                                        ) : events.length > 0 ? (
-                                            events.map((event, i) => {
-                                                const isMeet = event.htmlLink && event.htmlLink.includes('meet');
-                                                return (
-                                                    <div
-                                                        key={i}
-                                                        className="list-item"
-                                                        onClick={() => handleViewContent(event.htmlLink, isMeet ? 'meet' : 'calendar')}
-                                                    >
-                                                        <div className="list-content">
-                                                            <div className="item-title">{event.summary}</div>
-                                                            <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                <Clock size={12} />
-                                                                {event.start && new Date(event.start).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No upcoming events</div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            </div>
-
-                            {/* Meetings Widget */}
-                            <div className="col-span-6">
+                            {/* Meetings Widget - Full Width */}
+                            <div className="col-span-12">
                                 <motion.div
                                     className="card"
                                     initial={{ opacity: 0, y: 20 }}

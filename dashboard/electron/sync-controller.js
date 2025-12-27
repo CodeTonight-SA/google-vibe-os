@@ -206,10 +206,12 @@ class SyncController {
                             format: 'metadata'
                         });
                         const headers = detail.data.payload.headers;
+                        const isUnread = detail.data.labelIds?.includes('UNREAD') || false;
                         newEmails.push({
                             id: msg.id,
                             subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-                            from: headers.find(h => h.name === 'From')?.value || 'Unknown'
+                            from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+                            unread: isUnread
                         });
                     } catch {
                         // Skip if can't fetch details

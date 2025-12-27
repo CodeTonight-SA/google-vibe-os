@@ -489,12 +489,16 @@ app.on('ready', () => {
                     const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
                     const date = headers.find(h => h.name === 'Date')?.value || '';
 
+                    // Extract unread from labelIds
+                    const isUnread = detail.data.labelIds?.includes('UNREAD') || false;
+
                     emailList.push({
                         id: msg.id,
                         subject,
                         from,
                         date,
-                        snippet: detail.data.snippet
+                        snippet: detail.data.snippet,
+                        unread: isUnread
                     });
                 } catch (e) {
                     console.error('Error fetching email details', e);
