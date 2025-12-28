@@ -18,7 +18,7 @@ jobs:
             build_cmd: npm run build:mac -- --arm64
             asset_path: dashboard/release/*-arm64.dmg
             artifact_name: nightly-macos-arm64
-          - os: macos-13
+          - os: macos-15-large
             build_cmd: npm run build:mac -- --x64
             asset_path: dashboard/release/*-x64.dmg
             artifact_name: nightly-macos-x64
