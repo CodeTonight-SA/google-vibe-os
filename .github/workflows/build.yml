@@ -15,9 +15,6 @@ jobs:
           - os: macos-latest
             build_cmd: npm run build:mac -- --arm64
             artifact_pattern: "dashboard/release/*-arm64.dmg"
-          - os: macos-15-large
-            build_cmd: npm run build:mac -- --x64
-            artifact_pattern: "dashboard/release/*-x64.dmg"
           - os: windows-latest
             build_cmd: npm run build:win
             artifact_pattern: "dashboard/release/*.exe"

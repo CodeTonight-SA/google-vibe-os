@@ -24,10 +24,6 @@ jobs:
             build_cmd: npm run build:mac -- --arm64
             asset_path: dashboard/release/*-arm64.dmg
             artifact_name: release-macos-arm64
-          - os: macos-15-large
-            build_cmd: npm run build:mac -- --x64
-            asset_path: dashboard/release/*-x64.dmg
-            artifact_name: release-macos-x64
           - os: windows-latest
             build_cmd: npm run build:win
             asset_path: dashboard/release/*Setup*.exe
@@ -80,12 +76,6 @@ jobs:
           name: release-macos-arm64
           path: ./artifacts
 
-      - name: Download macOS x64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: release-macos-x64
-          path: ./artifacts
-
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
@@ -104,12 +94,7 @@ jobs:
             ## Installation
 
             **macOS (Apple Silicon - M1/M2/M3/M4):**
-            1. Download the arm64 DMG file
-            2. Open and drag to Applications
-            3. If blocked, run: `xattr -cr /Applications/Googol\ Vibe.app`
-
-            **macOS (Intel):**
-            1. Download the x64 DMG file
+            1. Download the DMG file
             2. Open and drag to Applications
             3. If blocked, run: `xattr -cr /Applications/Googol\ Vibe.app`
 

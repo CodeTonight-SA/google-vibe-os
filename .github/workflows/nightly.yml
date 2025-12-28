@@ -18,10 +18,6 @@ jobs:
             build_cmd: npm run build:mac -- --arm64
             asset_path: dashboard/release/*-arm64.dmg
             artifact_name: nightly-macos-arm64
-          - os: macos-15-large
-            build_cmd: npm run build:mac -- --x64
-            asset_path: dashboard/release/*-x64.dmg
-            artifact_name: nightly-macos-x64
           - os: windows-latest
             build_cmd: npm run build:win
             asset_path: dashboard/release/*Setup*.exe
@@ -75,12 +71,6 @@ jobs:
           name: nightly-macos-arm64
           path: ./artifacts
 
-      - name: Download macOS x64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nightly-macos-x64
-          path: ./artifacts
-
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
@@ -112,8 +102,7 @@ jobs:
 
             ### Installation
 
-            **macOS (Apple Silicon):** Download arm64 DMG
-            **macOS (Intel):** Download x64 DMG
+            **macOS (Apple Silicon):** Download DMG
             **Windows:** Download Setup.exe
 
             If macOS blocks the app, run: `xattr -cr /Applications/Googol\ Vibe.app`
