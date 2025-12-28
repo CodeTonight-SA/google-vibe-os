@@ -15,16 +15,33 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            build_cmd: npm run build:mac
-            asset_path: dashboard/release/*.dmg
+            build_cmd: npm run build:mac -- --arm64
+            asset_path: dashboard/release/*-arm64.dmg
+            artifact_name: nightly-macos-arm64
+          - os: macos-13
+            build_cmd: npm run build:mac -- --x64
+            asset_path: dashboard/release/*-x64.dmg
+            artifact_name: nightly-macos-x64
           - os: windows-latest
             build_cmd: npm run build:win
             asset_path: dashboard/release/*Setup*.exe
+            artifact_name: nightly-windows
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Generate nightly version
+        working-directory: dashboard
+        shell: bash
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          SHORT_SHA=${GITHUB_SHA::7}
+          VERSION="0.0.0-nightly.${DATE}.${SHORT_SHA}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Generating nightly version: $VERSION"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - uses: actions/setup-node@v4
         with:
@@ -45,23 +62,29 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nightly-${{ matrix.os }}
+          name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_path }}
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download macOS artifact
+      - name: Download macOS ARM64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: nightly-macos-latest
+          name: nightly-macos-arm64
+          path: ./artifacts
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-macos-x64
           path: ./artifacts
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: nightly-windows-latest
+          name: nightly-windows
           path: ./artifacts
 
       - name: Delete existing nightly release
@@ -89,7 +112,12 @@ jobs:
 
             ### Installation
 
-            **macOS:** If blocked, run `xattr -cr /Applications/Googol\ Vibe.app`
+            **macOS (Apple Silicon):** Download arm64 DMG
+            **macOS (Intel):** Download x64 DMG
+            **Windows:** Download Setup.exe
+
+            If macOS blocks the app, run: `xattr -cr /Applications/Googol\ Vibe.app`
           files: ./artifacts/*
+          draft: false
           prerelease: true
           make_latest: false

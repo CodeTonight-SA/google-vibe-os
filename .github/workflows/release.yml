@@ -21,18 +21,32 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            build_cmd: npm run build:mac
-            asset_name: Googol-Vibe-${{ github.ref_name || inputs.version }}-arm64.dmg
-            asset_path: dashboard/release/*.dmg
+            build_cmd: npm run build:mac -- --arm64
+            asset_path: dashboard/release/*-arm64.dmg
+            artifact_name: release-macos-arm64
+          - os: macos-13
+            build_cmd: npm run build:mac -- --x64
+            asset_path: dashboard/release/*-x64.dmg
+            artifact_name: release-macos-x64
           - os: windows-latest
             build_cmd: npm run build:win
-            asset_name: Googol-Vibe-${{ github.ref_name || inputs.version }}-Setup.exe
             asset_path: dashboard/release/*Setup*.exe
+            artifact_name: release-windows
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Sync version from tag
+        working-directory: dashboard
+        shell: bash
+        run: |
+          RAW_VERSION="${{ inputs.version || github.ref_name }}"
+          VERSION="${RAW_VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Syncing package.json to version: $VERSION"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - uses: actions/setup-node@v4
         with:
@@ -53,23 +67,29 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_path }}
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download macOS artifact
+      - name: Download macOS ARM64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: release-macos-latest
+          name: release-macos-arm64
+          path: ./artifacts
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos-x64
           path: ./artifacts
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: release-windows-latest
+          name: release-windows
           path: ./artifacts
 
       - name: List artifacts
@@ -83,8 +103,13 @@ jobs:
           body: |
             ## Installation
 
-            **macOS:**
-            1. Download the DMG file
+            **macOS (Apple Silicon - M1/M2/M3/M4):**
+            1. Download the arm64 DMG file
+            2. Open and drag to Applications
+            3. If blocked, run: `xattr -cr /Applications/Googol\ Vibe.app`
+
+            **macOS (Intel):**
+            1. Download the x64 DMG file
             2. Open and drag to Applications
             3. If blocked, run: `xattr -cr /Applications/Googol\ Vibe.app`
 
