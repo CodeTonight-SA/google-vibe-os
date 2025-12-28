@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Sparkles, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio } from 'lucide-react';
+import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio } from 'lucide-react';
+import logoImg from './assets/logo.webp';
 import { motion } from 'framer-motion';
 import AgentPanel from './components/AgentPanel';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -279,8 +280,8 @@ function App() {
     if (loading && !isAuthenticated) {
         return (
             <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Sparkles className="loading-pulse" color="#ea580c" size={32} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <img src={logoImg} alt="Googol Vibe" width={48} height={48} className="loading-pulse" style={{ borderRadius: 8 }} />
                     <h1 className="loading-pulse" style={{ color: '#000000', margin: 0, letterSpacing: '-0.03em' }}>Googol Vibe</h1>
                 </div>
             </div>
@@ -290,6 +291,7 @@ function App() {
     if (!isAuthenticated && !loading) {
         return (
             <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: 24 }}>
+                <img src={logoImg} alt="Googol Vibe" width={80} height={80} style={{ borderRadius: 12, marginBottom: 8 }} />
                 <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, color: '#000000', letterSpacing: '-0.03em' }}>Googol Vibe</h1>
                 <p style={{ color: '#6b7280', margin: 0 }}>Log in to access your intelligent workspace.</p>
                 <button
@@ -546,7 +548,10 @@ function App() {
                 <header className="header">
                     <div className="header-content">
                         <p style={{ margin: 0, fontFamily: 'ui-monospace, "SF Mono", monospace', fontSize: '0.75rem', color: '#ea580c', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>WELCOME BACK</p>
-                        <h1>Google Vibe OS</h1>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <img src={logoImg} alt="" width={40} height={40} style={{ borderRadius: 8 }} />
+                            <h1>Googol Vibe</h1>
+                        </div>
                         {profile && (
                             <p>
                                 Ready to work, <b>{profile.name}</b>.

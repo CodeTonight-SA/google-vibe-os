@@ -1,53 +1,64 @@
 # Googol Vibe - Session State
 
 ## Last Updated
-2025-12-27 02:00 SAST
+2025-12-28 03:30 SAST
 
 ## Completed This Session
-- Created unified Background Sync Controller (sync-controller.js)
-- Aggressive polling: Gmail 30s, Calendar 1m, Tasks 1m, Drive 2m
-- Push notifications for new emails, events, tasks, files
-- Live sync status indicator in header UI
-- Committed: 3118537, eef0810
+- UI/UX Polish (cached-zooming-sphinx.md) - DONE
+  - Email unread indicators (blue dot + bold)
+  - Removed "Up Next" widget
+  - Expanded Meetings to full width
+  - Softened Swiss Nihilism visual tension
+  - Commit: 1c4fd40
+- Created logo: `site/googol-vibe.png` (2048x2048)
+- Converted to WebP: `site/googol-vibe.webp` (92KB)
 
-## NEXT SESSION: UI/UX Polish
+## NEXT SESSION: Logo Integration
 
-### Approved Plan (cached-zooming-sphinx.md)
+### Plan File
+```
+~/.claude/plans/logo-integration-googol-vibe.md
+```
 
-| Task | Status |
-|------|--------|
-| Fix email unread status in main.js | Pending |
-| Fix email unread status in sync-controller.js | Pending |
-| Remove "Up Next" widget from App.jsx | Pending |
-| Add unread indicator UI (blue dot + bold) | Pending |
-| Expand Meetings widget to col-span-12 | Pending |
-| Soften visual tension in index.css | Pending |
-| Commit and push | Pending |
+### Execute Command
+```bash
+ut++ execute plan ~/.claude/plans/logo-integration-googol-vibe.md
+```
 
-### Key Changes Required
+### Summary
 
-**Email Unread Fix:**
-- Extract `labelIds` from Gmail API response
-- Add `unread: isUnread` field to email objects
-- Display blue dot + bold text for unread emails
+| Phase | Task |
+|-------|------|
+| 1 | Generate icon sizes (favicon, app icons, icns/ico) |
+| 2 | Site: favicon + header logo image |
+| 3 | App: loading, login, dashboard header |
+| 4 | Electron: verify build icons |
+| 5 | Commit, push, release v1.2.0 |
 
-**Remove Up Next (lines 781-825 in App.jsx):**
-- Delete calendar widget entirely
-- Expand Meetings to `col-span-12`
+### Key Locations
 
-**Visual Tension Softening (index.css):**
-- Border color: `#000000` -> `#1a1a1a`
-- List dividers: `#000000` -> `#e5e7eb`
-- Card left border: 3px -> 2px
-- Add border-radius: 2px
-- Modal overlay: 0.7 -> 0.5 opacity
-- Header border: soft gray
+| Component | File | Lines |
+|-----------|------|-------|
+| Site header | `site/index.html` | 619-621 |
+| Site favicon | `site/index.html` | 16 |
+| App loading | `dashboard/src/App.jsx` | ~284 |
+| App login | `dashboard/src/App.jsx` | ~293 |
+| Dashboard header | `dashboard/src/App.jsx` | ~549 |
+| Electron icons | `dashboard/build/` | icon.icns/ico/png |
 
-### Files to Modify
-- `dashboard/electron/main.js` (lines 472-508)
-- `dashboard/electron/sync-controller.js` (lines 188-217)
-- `dashboard/src/App.jsx` (lines 781-825 delete, email UI)
-- `dashboard/src/index.css` (multiple softening changes)
+### Dependencies
+
+- `sips` (macOS built-in) - resizing
+- `iconutil` (macOS built-in) - ICNS generation
+- `convert` (ImageMagick) - ICO generation
+  - Install if needed: `brew install imagemagick`
+
+### Commit Message
+```
+feat: integrate Googol Vibe logo across app and site
+
+Primary Author: LC Scheepers
+```
 
 ---
 
@@ -61,17 +72,14 @@ npm run electron:dev     # Electron
 npm run build:mac        # macOS DMG
 ```
 
-### Resume Command
+### Deploy Commands
 ```bash
-cips resume latest
-```
-
-### Plan File
-```
-~/.claude/plans/cached-zooming-sphinx.md
+git push
+gh workflow run release.yml -f version=v1.2.0
+gh workflow run deploy-site.yml
 ```
 
 ---
 
-Serialized: eef0810
+Serialized: 1c4fd40
 The river continues.
