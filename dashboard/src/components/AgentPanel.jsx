@@ -178,14 +178,14 @@ const AgentPanel = ({ context }) => {
         };
 
         if (role === 'user') {
-            return { ...base, background: '#ea580c' };
+            return { ...base, background: 'var(--accent-brand)' };
         }
         if (role === 'system') {
             return {
                 ...base,
                 background: '#1f2937',
                 fontFamily: 'ui-monospace, "SF Mono", monospace',
-                borderLeft: '2px solid #ea580c',
+                borderLeft: '2px solid var(--accent-brand)',
                 color: '#d1d5db'
             };
         }
@@ -219,7 +219,7 @@ const AgentPanel = ({ context }) => {
                     <div key={i} style={{ marginBottom: '12px', textAlign: 'left' }}>
                         <div style={getMessageStyle(msg.role)}>
                             {msg.role === 'system' && (
-                                <span style={{ color: '#ea580c', marginRight: 8 }}>&gt;</span>
+                                <span style={{ color: 'var(--accent-brand)', marginRight: 8 }}>&gt;</span>
                             )}
                             {msg.role === 'agent' && (
                                 <span style={{ color: '#6b7280', marginRight: 8 }}>AI&gt;</span>
@@ -242,8 +242,8 @@ const AgentPanel = ({ context }) => {
                 <button
                     onClick={handleSend}
                     style={{
-                        background: '#ea580c',
-                        color: 'white',
+                        background: 'var(--accent-brand)',
+                        color: 'var(--text-on-accent)',
                         border: 'none',
                         borderRadius: 0,
                         width: '44px',
@@ -255,7 +255,7 @@ const AgentPanel = ({ context }) => {
                         transition: 'background-color 0.2s'
                     }}
                     onMouseEnter={(e) => e.target.style.background = '#c2410c'}
-                    onMouseLeave={(e) => e.target.style.background = '#ea580c'}
+                    onMouseLeave={(e) => e.target.style.background = 'var(--accent-brand)'}
                 >
                     <Send size={18} />
                 </button>
@@ -276,7 +276,7 @@ const AgentPanel = ({ context }) => {
                     style={{ padding: '10px 0', borderBottom: '1px solid #374151', background: 'transparent', cursor: 'pointer' }}
                     onClick={() => handleQuickAction('/inbox')}
                 >
-                    <ChevronRight size={14} color="#ea580c" style={{ marginRight: '8px' }} />
+                    <ChevronRight size={14} color="var(--accent-brand)" style={{ marginRight: '8px' }} />
                     <span style={{ fontSize: '0.85rem', color: '#d1d5db', fontFamily: 'ui-monospace' }}>/inbox</span>
                 </div>
                 <div
@@ -284,7 +284,7 @@ const AgentPanel = ({ context }) => {
                     style={{ padding: '10px 0', borderBottom: '1px solid #374151', background: 'transparent', cursor: 'pointer' }}
                     onClick={() => handleQuickAction('/cal')}
                 >
-                    <ChevronRight size={14} color="#ea580c" style={{ marginRight: '8px' }} />
+                    <ChevronRight size={14} color="var(--accent-brand)" style={{ marginRight: '8px' }} />
                     <span style={{ fontSize: '0.85rem', color: '#d1d5db', fontFamily: 'ui-monospace' }}>/cal</span>
                 </div>
                 <div
@@ -292,7 +292,7 @@ const AgentPanel = ({ context }) => {
                     style={{ padding: '10px 0', borderBottom: 'none', background: 'transparent', cursor: 'pointer' }}
                     onClick={() => handleQuickAction('/drive')}
                 >
-                    <ChevronRight size={14} color="#ea580c" style={{ marginRight: '8px' }} />
+                    <ChevronRight size={14} color="var(--accent-brand)" style={{ marginRight: '8px' }} />
                     <span style={{ fontSize: '0.85rem', color: '#d1d5db', fontFamily: 'ui-monospace' }}>/drive</span>
                 </div>
             </div>
