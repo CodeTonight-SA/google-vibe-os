@@ -35,6 +35,37 @@ let authWindow;
 let authClient;
 let contentView = null; // Track the active BrowserView
 
+// Security: Trusted domains for navigation and content loading
+const TRUSTED_DOMAINS = [
+    'accounts.google.com',
+    'docs.google.com',
+    'drive.google.com',
+    'meet.google.com',
+    'sheets.google.com',
+    'slides.google.com',
+    'calendar.google.com',
+    'mail.google.com',
+    'myaccount.google.com'
+];
+
+/**
+ * Check if a URL is a trusted destination.
+ * Allows Google domains, localhost (dev server), and file:// (production).
+ */
+function isTrustedURL(urlString) {
+    try {
+        const parsed = new URL(urlString);
+        if (parsed.protocol === 'file:') return true;
+        if (parsed.hostname === 'localhost') return true;
+        if (parsed.protocol !== 'https:') return false;
+        return TRUSTED_DOMAINS.some(domain =>
+            parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+        );
+    } catch {
+        return false;
+    }
+}
+
 // ConfigManager provides all paths - see config-manager.js for details
 // Legacy paths kept for reference during migration:
 // TOKEN_PATH was: path.join(app.getPath('userData'), 'token.json')
@@ -328,6 +359,25 @@ const createWindow = () => {
             const bounds = mainWindow.getBounds();
             contentView.setBounds({ x: 0, y: 80, width: bounds.width, height: bounds.height - 80 });
         }
+    });
+
+    // Security: Block navigation to untrusted domains
+    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+        if (!isTrustedURL(navigationUrl)) {
+            console.warn('[Security] Blocked navigation to:', navigationUrl);
+            event.preventDefault();
+        }
+    });
+
+    // Security: Block new window creation to untrusted domains
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (isTrustedURL(url)) {
+            // Open Google links in system browser
+            shell.openExternal(url);
+        } else {
+            console.warn('[Security] Blocked window open to:', url);
+        }
+        return { action: 'deny' };
     });
 };
 
@@ -868,6 +918,13 @@ app.on('ready', () => {
     });
 
     ipcMain.handle('view-content', async (event, { url, type }) => {
+        // Security: Only allow trusted Google domains in the BrowserView
+        // The BrowserView shares the persist:googleos session (Google auth cookies)
+        if (!isTrustedURL(url)) {
+            console.warn('[Security] Blocked view-content for untrusted URL:', url);
+            return;
+        }
+
         // Meet now uses BrowserView with permission handler (see createWindow)
         if (contentView) {
             mainWindow.removeBrowserView(contentView);

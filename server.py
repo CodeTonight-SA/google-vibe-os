@@ -8,7 +8,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend
+CORS(app, origins=["http://localhost:9000"])  # Restrict CORS to local frontend only
 
 # Configuration
 CREDENTIALS_FILE = '.agent/secrets/credentials.json'
