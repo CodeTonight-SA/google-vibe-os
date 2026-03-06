@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio, Settings } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio, Settings, LogOut, Moon, Sun, ChevronDown } from 'lucide-react';
+import { useTheme } from './ThemeContext';
 import logoImg from './assets/logo.webp';
 import { motion } from 'framer-motion';
 import AgentPanel from './components/AgentPanel';
@@ -41,6 +42,13 @@ const SkeletonFileCard = () => (
     </div>
 );
 
+function getTimeGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+}
+
 function App() {
     const [emails, setEmails] = useState([]);
     const [events, setEvents] = useState([]);
@@ -74,6 +82,22 @@ function App() {
     const [isSyncing, setIsSyncing] = useState(false);
     const { toasts, addToast, removeToast } = useToast();
     const [showSettings, setShowSettings] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const profileMenuRef = useRef(null);
+    const { theme, toggleTheme } = useTheme();
+
+    // Close profile dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+                setShowProfileMenu(false);
+            }
+        };
+        if (showProfileMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showProfileMenu]);
 
     const fetchData = async () => {
         try {
@@ -270,7 +294,9 @@ function App() {
 
             // Escape: close overlays in priority order
             if (e.key === 'Escape') {
-                if (isTaskModalOpen) {
+                if (showProfileMenu) {
+                    setShowProfileMenu(false);
+                } else if (isTaskModalOpen) {
                     setIsTaskModalOpen(false);
                     setSelectedTask(null);
                 } else if (showSettings) {
@@ -304,7 +330,7 @@ function App() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [contentViewOpen, showSettings, isTaskModalOpen, isAuthenticated, loading]);
+    }, [contentViewOpen, showSettings, showProfileMenu, isTaskModalOpen, isAuthenticated, loading]);
 
     const handleLogin = async () => {
         try {
@@ -608,22 +634,23 @@ function App() {
             {!contentViewOpen && (
                 <header className="header">
                     <div className="header-content">
-                        <p style={{ margin: 0, fontFamily: 'ui-monospace, "SF Mono", monospace', fontSize: '0.75rem', color: 'var(--accent-brand)', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>WELCOME BACK</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img src={logoImg} alt="" width={40} height={40} style={{ borderRadius: 8 }} />
-                            <h1>Googol Vibe</h1>
+                        <h1>
+                            {profile
+                                ? <>{getTimeGreeting()}, <b>{profile.name.split(' ')[0]}</b>.</>
+                                : <>{getTimeGreeting()}.</>
+                            }
+                        </h1>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                            <img src={logoImg} alt="" width={20} height={20} style={{ borderRadius: 4 }} />
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>Googol Vibe</span>
                         </div>
-                        {profile && (
-                            <p>
-                                Ready to work, <b>{profile.name}</b>.
-                            </p>
-                        )}
                     </div>
 
                     {isAuthenticated && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             {/* Sync Status Indicator */}
                             <div
+                                className="sync-indicator"
                                 onClick={async () => {
                                     if (isSyncing) return;
                                     setIsSyncing(true);
@@ -636,70 +663,92 @@ function App() {
                                     }
                                     setIsSyncing(false);
                                 }}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    cursor: 'pointer',
-                                    padding: '6px 10px',
-                                    background: isSyncing ? 'var(--bg-subtle)' : 'transparent',
-                                    border: '1px solid var(--border-light)',
-                                    transition: 'all 0.2s'
-                                }}
                                 title={syncStatus?.gmail?.lastSync ? `Last sync: ${new Date(syncStatus.gmail.lastSync).toLocaleTimeString()}` : 'Click to sync'}
                             >
-                                <Radio
-                                    size={14}
-                                    color={isSyncing ? '#ea580c' : '#22c55e'}
-                                    className={isSyncing ? 'sync-pulse' : ''}
-                                />
-                                <span style={{
-                                    fontFamily: 'ui-monospace, "SF Mono", monospace',
-                                    fontSize: '0.625rem',
-                                    color: 'var(--text-muted)',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
-                                }}>
+                                <span className={`sync-dot ${isSyncing ? 'syncing' : ''}`} />
+                                <span className="sync-label">
                                     {isSyncing ? 'Syncing...' : 'Live'}
                                 </span>
                             </div>
-                            {profile && <img src={profile.picture} alt="Profile" referrerPolicy="no-referrer" style={{ width: 44, height: 44, borderRadius: 0, border: '1px solid var(--border-medium)' }} />}
-                            <button
-                                onClick={() => setShowSettings(true)}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px solid var(--border-medium)',
-                                    padding: '8px',
-                                    borderRadius: 0,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.2s'
-                                }}
-                                title="Settings"
-                                aria-label="Open settings"
-                            >
-                                <Settings size={16} color="var(--text-muted)" />
-                            </button>
-                            <button
-                                onClick={handleLogout}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px solid var(--text-primary)',
-                                    color: 'var(--text-primary)',
-                                    padding: '8px 16px',
-                                    borderRadius: 0,
-                                    cursor: 'pointer',
-                                    fontFamily: 'ui-monospace, "SF Mono", monospace',
-                                    fontSize: '0.625rem',
-                                    fontWeight: 500,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.1em'
-                                }}
-                            >
-                                Logout
-                            </button>
+
+                            {/* Profile Avatar Dropdown */}
+                            <div className="profile-dropdown-wrapper" ref={profileMenuRef}>
+                                <button
+                                    className="profile-avatar-trigger"
+                                    onClick={() => setShowProfileMenu(prev => !prev)}
+                                    aria-label="Open profile menu"
+                                    aria-expanded={showProfileMenu}
+                                >
+                                    {profile?.picture ? (
+                                        <img
+                                            src={profile.picture}
+                                            alt={profile.name || 'Profile'}
+                                            referrerPolicy="no-referrer"
+                                            className="profile-avatar"
+                                        />
+                                    ) : (
+                                        <div className="profile-avatar profile-avatar-fallback">
+                                            <User size={18} />
+                                        </div>
+                                    )}
+                                    <ChevronDown
+                                        size={12}
+                                        className={`profile-chevron ${showProfileMenu ? 'open' : ''}`}
+                                    />
+                                </button>
+
+                                {showProfileMenu && (
+                                    <div className="profile-menu">
+                                        {/* User Identity */}
+                                        <div className="profile-menu-identity">
+                                            <span className="profile-menu-name">{profile?.name || 'User'}</span>
+                                            {profile?.email && (
+                                                <span className="profile-menu-email">{profile.email}</span>
+                                            )}
+                                        </div>
+
+                                        <div className="profile-menu-divider" />
+
+                                        {/* Settings */}
+                                        <button
+                                            className="profile-menu-item"
+                                            onClick={() => {
+                                                setShowProfileMenu(false);
+                                                setShowSettings(true);
+                                            }}
+                                        >
+                                            <Settings size={14} />
+                                            <span>Settings</span>
+                                        </button>
+
+                                        {/* Dark Mode Toggle */}
+                                        <button
+                                            className="profile-menu-item"
+                                            onClick={toggleTheme}
+                                        >
+                                            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                                            <span>Dark Mode</span>
+                                            <span className={`profile-menu-toggle ${theme === 'dark' ? 'active' : ''}`}>
+                                                <span className="profile-menu-toggle-knob" />
+                                            </span>
+                                        </button>
+
+                                        <div className="profile-menu-divider" />
+
+                                        {/* Logout */}
+                                        <button
+                                            className="profile-menu-item profile-menu-item-danger"
+                                            onClick={() => {
+                                                setShowProfileMenu(false);
+                                                handleLogout();
+                                            }}
+                                        >
+                                            <LogOut size={14} />
+                                            <span>Log out</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </header>
@@ -709,7 +758,7 @@ function App() {
                 <div className="grid">
                     {/* Main Content Area (9 Columns) */}
                     <div className="col-span-9">
-                        <div className="grid" style={{ gap: '24px' }}>
+                        <div className="grid" style={{ gap: '32px' }}>
                             {/* Mail Widget */}
                             <div className="col-span-7">
                                 <motion.div
@@ -838,9 +887,9 @@ function App() {
                                                             key={task.id}
                                                             className={`list-item task-item-clickable ${isRecurring ? 'task-recurring' : ''}`}
                                                             onClick={() => handleOpenTaskModal(task)}
-                                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                                                            style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}
                                                         >
-                                                            <div className="list-content" style={{ flex: 1 }}>
+                                                            <div className="list-content" style={{ flex: 1, minWidth: 0 }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
                                                                     {isRecurring && (
                                                                         <span className="task-recurring-icon">
@@ -848,11 +897,6 @@ function App() {
                                                                         </span>
                                                                     )}
                                                                     <span className="task-item-title">{task.title}</span>
-                                                                    {task.notes && (
-                                                                        <span className="task-item-has-notes">
-                                                                            <StickyNote size={12} />
-                                                                        </span>
-                                                                    )}
                                                                 </div>
                                                                 {task.due && (
                                                                     <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -861,6 +905,11 @@ function App() {
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                            {task.notes && (
+                                                                <span className="task-item-has-notes" style={{ flexShrink: 0, paddingTop: 2 }}>
+                                                                    <StickyNote size={12} />
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     );
                                                 })
@@ -953,6 +1002,7 @@ function App() {
                                                 <div
                                                     key={doc.id}
                                                     className="doc-card"
+                                                    data-tooltip={doc.name}
                                                     onClick={() => handleViewContent(
                                                         getPreviewUrl(doc.id, doc.mimeType),
                                                         'document',
@@ -1010,6 +1060,7 @@ function App() {
                                                 <div
                                                     key={file.id}
                                                     className="file-card"
+                                                    data-tooltip={file.name}
                                                     style={{ cursor: 'pointer' }}
                                                     onClick={() => handleViewContent(file.webViewLink, 'file')}
                                                 >

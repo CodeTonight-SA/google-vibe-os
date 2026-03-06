@@ -45,7 +45,8 @@ const TRUSTED_DOMAINS = [
     'slides.google.com',
     'calendar.google.com',
     'mail.google.com',
-    'myaccount.google.com'
+    'myaccount.google.com',
+    'tasks.google.com'
 ];
 
 /**

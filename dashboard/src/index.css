@@ -1,6 +1,6 @@
 /* Swiss Nihilism Design System - Pure Reduction */
 :root {
-    --bg-color: #ffffff;
+    --bg-color: #f8f9fa;
     --card-bg: #ffffff;
     --card-border: #000000;
     --text-primary: #000000;
@@ -33,7 +33,7 @@
 /* Dark theme overrides */
 [data-theme="dark"] {
     --bg-color: #0a0a0a;
-    --card-bg: #141414;
+    --card-bg: #111111;
     --card-border: #2a2a2a;
     --text-primary: #e5e5e5;
     --text-heading: #f5f5f5;
@@ -63,6 +63,11 @@
 [data-theme="dark"] .card {
     background: var(--card-bg);
     border-color: var(--card-border);
+    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.03), 0 1px 2px rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .card:hover {
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.04), 0 2px 4px rgba(255, 255, 255, 0.02);
 }
 
 [data-theme="dark"] .header {
@@ -167,6 +172,25 @@
 /* ── Dark Mode: Header ── */
 [data-theme="dark"] .header {
     border-bottom-color: var(--border-light);
+}
+
+/* ── Dark Mode: Profile Dropdown ── */
+[data-theme="dark"] .profile-menu {
+    background: var(--card-bg);
+    border-color: var(--border-medium);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .profile-menu-item:hover {
+    background: var(--bg-hover);
+}
+
+[data-theme="dark"] .profile-menu-item-danger:hover {
+    background: rgba(220, 38, 38, 0.15);
+}
+
+[data-theme="dark"] .profile-menu-toggle {
+    background: var(--bg-hover);
 }
 
 /* ── Dark Mode: Task Modal ── */
@@ -510,34 +534,239 @@ body {
 }
 
 .header {
-    margin-bottom: 48px;
+    margin-bottom: 32px;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    padding-bottom: 24px;
+    padding-bottom: 20px;
     border-bottom: 1px solid #e5e7eb;
 }
 
 .header-content h1 {
-    font-size: 2.5rem;
-    font-weight: 800;
+    font-size: 1.25rem;
+    font-weight: 400;
     color: var(--text-heading);
     margin: 0;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
 }
 
-.header-content p {
+.header-content h1 b {
+    font-weight: 700;
+}
+
+/* ============================================
+   Sync Indicator
+   ============================================ */
+
+.sync-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 6px 10px;
+    transition: opacity 0.2s;
+}
+
+.sync-indicator:hover {
+    opacity: 0.7;
+}
+
+.sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+}
+
+.sync-dot.syncing {
+    background: #ea580c;
+    animation: sync-pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes sync-pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.sync-label {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ============================================
+   Profile Avatar Dropdown
+   ============================================ */
+
+.profile-dropdown-wrapper {
+    position: relative;
+}
+
+.profile-avatar-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    padding: 3px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.profile-avatar-trigger:hover {
+    border-color: var(--border-light);
+}
+
+.profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    display: block;
+}
+
+.profile-avatar-fallback {
+    background: var(--bg-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.profile-chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.profile-chevron.open {
+    transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+
+.profile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 220px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    z-index: 1000;
+    padding: 4px 0;
+    animation: profile-menu-enter 0.15s ease-out;
+}
+
+@keyframes profile-menu-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.profile-menu-identity {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.profile-menu-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.profile-menu-email {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: ui-monospace, "SF Mono", monospace;
+}
+
+.profile-menu-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+}
+
+.profile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
-    font-size: 1.1rem;
-    margin-top: 8px;
-    font-weight: 400;
+    text-align: left;
+    transition: background 0.15s, color 0.15s;
+}
+
+.profile-menu-item:hover {
+    background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+    color: var(--text-primary);
+}
+
+.profile-menu-item-danger {
+    color: #dc2626;
+}
+
+.profile-menu-item-danger:hover {
+    background: rgba(220, 38, 38, 0.06);
+    color: #dc2626;
+}
+
+/* Mini Toggle Switch */
+
+.profile-menu-toggle {
+    margin-left: auto;
+    width: 32px;
+    height: 18px;
+    border-radius: 10px;
+    background: var(--border-medium, #d1d5db);
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.profile-menu-toggle.active {
+    background: #ea580c;
+}
+
+.profile-menu-toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.profile-menu-toggle.active .profile-menu-toggle-knob {
+    transform: translateX(14px);
 }
 
 .grid {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    gap: 32px;
+    gap: 40px;
 }
 
 .col-span-8 {
@@ -620,6 +849,8 @@ body {
     display: flex;
     gap: 16px;
     overflow-x: auto;
+    padding-top: 40px;
+    margin-top: -40px;
     padding-bottom: 8px;
     scrollbar-width: thin;
     scrollbar-color: var(--accent-primary) transparent;
@@ -644,7 +875,7 @@ body {
     flex-shrink: 0;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 0;
+    border-radius: 6px;
     padding: 16px;
     cursor: pointer;
     transition: box-shadow 0.2s, border-color 0.2s;
@@ -653,6 +884,54 @@ body {
 .doc-card:hover {
     box-shadow: var(--shadow-md);
     border-color: var(--accent-primary);
+}
+
+/* Card Tooltips */
+.doc-card[data-tooltip],
+.file-card[data-tooltip] {
+    position: relative;
+}
+
+.doc-card[data-tooltip]::after,
+.file-card[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    padding: 6px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    transition-delay: 0s;
+    z-index: 100;
+}
+
+/* Both doc-cards and file-cards: tooltip above card */
+.doc-card[data-tooltip]::after,
+.file-card[data-tooltip]::after {
+    bottom: calc(100% + 8px);
+}
+
+/* Doc-cards: left-align tooltip to prevent left-edge clipping in scroll container */
+.doc-card[data-tooltip]::after {
+    left: 0;
+    transform: none;
+}
+
+.doc-card[data-tooltip]:hover::after,
+.file-card[data-tooltip]:hover::after {
+    opacity: 1;
+    transition-delay: 0.5s;
 }
 
 /* Text Truncation */
@@ -693,29 +972,31 @@ body {
     }
 }
 
-/* Cards - Swiss Nihilism (Softened) */
+/* Cards - Swiss Nihilism (Modern) */
 .card {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-left: 2px solid var(--accent-primary);
-    border-radius: 2px;
-    padding: 32px;
-    transition: box-shadow 0.2s ease;
-    height: 100%;
+    border: none;
+    border-left: 3px solid var(--accent-primary);
+    border-radius: 6px;
+    padding: 28px;
+    transition: box-shadow 0.25s ease;
+    align-self: start;
     display: flex;
     flex-direction: column;
-    box-shadow: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .card:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-light);
 }
 
 .card-title {
@@ -836,7 +1117,7 @@ body {
 .file-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 0;
+    border-radius: 6px;
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -882,7 +1163,7 @@ body {
     background: var(--dark);
     border: 1px solid #374151;
     border-left: 3px solid var(--accent-primary);
-    border-radius: 0;
+    border-radius: 6px;
 }
 
 .agent-panel .card-header {
@@ -907,6 +1188,27 @@ body {
     border: none;
     padding: 16px;
     overflow-y: auto;
+    overflow-x: hidden;
+    /* Slim scrollbar - always white on dark terminal background */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.agent-chat-area::-webkit-scrollbar {
+    width: 4px;
+}
+
+.agent-chat-area::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.agent-chat-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.agent-chat-area::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .agent-input-container {
