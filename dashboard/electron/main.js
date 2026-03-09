@@ -906,14 +906,21 @@ app.on('ready', () => {
     ipcMain.handle('switch-to-edit', async (event, { docId, docType }) => {
         if (!contentView) return;
 
+        // Security: Validate docId contains only safe characters (alphanumeric, hyphens, underscores)
+        if (!docId || !/^[a-zA-Z0-9_-]+$/.test(docId)) {
+            console.warn('[Security] Blocked switch-to-edit with invalid docId:', docId);
+            return;
+        }
+
         const editUrls = {
             'document': `https://docs.google.com/document/d/${docId}/edit`,
             'spreadsheet': `https://docs.google.com/spreadsheets/d/${docId}/edit`,
             'presentation': `https://docs.google.com/presentation/d/${docId}/edit`
         };
 
-        if (editUrls[docType]) {
-            contentView.webContents.loadURL(editUrls[docType]);
+        const editUrl = editUrls[docType];
+        if (editUrl && isTrustedURL(editUrl)) {
+            contentView.webContents.loadURL(editUrl);
         }
     });
 
@@ -1075,9 +1082,11 @@ app.on('ready', () => {
             if (mainWindow) {
                 await mainWindow.webContents.session.clearStorageData();
             }
-            // Clear the partition session
-            const sharedSession = require('electron').session.fromPartition('persist:googolvibe');
-            await sharedSession.clearStorageData();
+            // Clear both partition sessions (googolvibe = main UI, googleos = auth/BrowserView)
+            const uiSession = require('electron').session.fromPartition('persist:googolvibe');
+            await uiSession.clearStorageData();
+            const authSession = require('electron').session.fromPartition('persist:googleos');
+            await authSession.clearStorageData();
         } catch (e) {
             console.error("Error clearing session", e);
         }
