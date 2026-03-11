@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { RRule } = require('rrule');
 const configManager = require('./config-manager');
+const log = require('./logger');
 
 class RecurrenceManager {
     constructor() {
@@ -36,7 +37,7 @@ class RecurrenceManager {
                 this.rules = [];
             }
         } catch (e) {
-            console.error('[RecurrenceManager] Failed to load rules:', e);
+            log.error('[RecurrenceManager] Failed to load rules:', e);
             this.rules = [];
         }
     }
@@ -49,7 +50,7 @@ class RecurrenceManager {
             const data = { rules: this.rules, updatedAt: new Date().toISOString() };
             fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2));
         } catch (e) {
-            console.error('[RecurrenceManager] Failed to save rules:', e);
+            log.error('[RecurrenceManager] Failed to save rules:', e);
         }
     }
 
@@ -160,7 +161,7 @@ class RecurrenceManager {
             const next = rule.after(after, true); // inclusive
             return next ? next.toISOString() : null;
         } catch (e) {
-            console.error('[RecurrenceManager] Invalid RRULE:', rruleString, e);
+            log.error('[RecurrenceManager] Invalid RRULE:', rruleString, e);
             return null;
         }
     }
