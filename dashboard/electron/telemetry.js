@@ -9,6 +9,7 @@
  */
 
 const configManager = require('./config-manager');
+const log = require('./logger');
 
 // Sentry DSN - replace with your actual DSN when ready
 // For now, use empty string to prevent any data transmission
@@ -26,12 +27,12 @@ function initTelemetry() {
     // 2. DSN is configured
     // 3. Not already initialized
     if (!configManager.isTelemetryEnabled()) {
-        console.log('[Telemetry] Disabled - user has not opted in');
+        log.info('[Telemetry] Disabled - user has not opted in');
         return false;
     }
 
     if (!SENTRY_DSN) {
-        console.log('[Telemetry] DSN not configured - skipping initialization');
+        log.info('[Telemetry] DSN not configured - skipping initialization');
         return false;
     }
 
@@ -98,10 +99,10 @@ function initTelemetry() {
         });
 
         sentryInitialized = true;
-        console.log('[Telemetry] Sentry initialized (opt-in)');
+        log.info('[Telemetry] Sentry initialized (opt-in)');
         return true;
     } catch (e) {
-        console.error('[Telemetry] Failed to initialize Sentry:', e.message);
+        log.error('[Telemetry] Failed to initialize Sentry:', e.message);
         return false;
     }
 }
@@ -119,7 +120,7 @@ function enableTelemetry() {
  */
 function disableTelemetry() {
     configManager.setTelemetryEnabled(false);
-    console.log('[Telemetry] Disabled - will take effect on next app start');
+    log.info('[Telemetry] Disabled - will take effect on next app start');
     return true;
 }
 

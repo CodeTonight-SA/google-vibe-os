@@ -9,6 +9,9 @@ const telemetry = require('./telemetry');
 const recurrenceManager = require('./recurrence-manager');
 const notificationManager = require('./notification-manager');
 const syncController = require('./sync-controller');
+const log = require('./logger');
+
+log.info('[Googol Vibe] App starting — log transport active');
 
 // Handle EPIPE errors gracefully - occurs when stdout/stderr pipe closes
 process.stdout?.on?.('error', (err) => {
@@ -87,7 +90,7 @@ async function loadCredentials() {
         const keys = JSON.parse(content);
         return keys.installed || keys.web;
     } catch (e) {
-        console.error("Error loading credentials from:", configManager.getCredentialsPath(), e);
+        log.error("Error loading credentials from:", configManager.getCredentialsPath(), e);
         return null; // Handle missing credentials gracefully
     }
 }
@@ -186,7 +189,7 @@ async function loadSavedCredentialsIfExist() {
         client.setCredentials(tokens);
         return client;
     } catch (err) {
-        console.error('Error loading saved credentials:', err);
+        log.error('Error loading saved credentials:', err);
         return null;
     }
 }
@@ -195,7 +198,7 @@ async function saveCredentials(client) {
     const tokenPath = configManager.getTokenPath();
     const payload = JSON.stringify(client.credentials);
     await fs.promises.writeFile(tokenPath, payload);
-    console.log('Token saved to:', tokenPath);
+    log.info('Token saved to:', tokenPath);
 }
 
 // ========================================
@@ -208,17 +211,17 @@ async function checkAndGenerateRecurringTasks() {
     try {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) {
-            console.log('[Recurrence] No auth client, skipping check');
+            log.info('[Recurrence] No auth client, skipping check');
             return;
         }
 
         const dueRules = recurrenceManager.getDueRules();
         if (dueRules.length === 0) {
-            console.log('[Recurrence] No tasks due');
+            log.info('[Recurrence] No tasks due');
             return;
         }
 
-        console.log(`[Recurrence] ${dueRules.length} task(s) due for generation`);
+        log.info(`[Recurrence] ${dueRules.length} task(s) due for generation`);
         const tasks = google.tasks({ version: 'v1', auth: authClient });
 
         for (const rule of dueRules) {
@@ -233,7 +236,7 @@ async function checkAndGenerateRecurringTasks() {
                     }
                 });
 
-                console.log(`[Recurrence] Generated task: ${rule.title}`);
+                log.info(`[Recurrence] Generated task: ${rule.title}`);
 
                 // Mark as generated and calculate next occurrence
                 recurrenceManager.markGenerated(rule.id);
@@ -250,11 +253,11 @@ async function checkAndGenerateRecurringTasks() {
                     });
                 }
             } catch (e) {
-                console.error(`[Recurrence] Failed to generate task "${rule.title}":`, e.message);
+                log.error(`[Recurrence] Failed to generate task "${rule.title}":`, e.message);
             }
         }
     } catch (e) {
-        console.error('[Recurrence] Scheduler error:', e);
+        log.error('[Recurrence] Scheduler error:', e);
     }
 }
 
@@ -267,7 +270,7 @@ function startRecurrenceScheduler() {
         checkAndGenerateRecurringTasks();
     }, 60 * 60 * 1000);
 
-    console.log('[Recurrence] Scheduler started (hourly checks)');
+    log.info('[Recurrence] Scheduler started (hourly checks)');
 }
 
 function stopRecurrenceScheduler() {
@@ -288,9 +291,9 @@ async function startSyncController() {
     if (authClient) {
         syncController.init(authClient, mainWindow);
         syncController.start();
-        console.log('[SyncController] Started background sync');
+        log.info('[SyncController] Started background sync');
     } else {
-        console.log('[SyncController] No auth client, will start after login');
+        log.info('[SyncController] No auth client, will start after login');
     }
 }
 
@@ -364,7 +367,7 @@ const createWindow = () => {
     // Security: Block navigation to untrusted domains
     mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
         if (!isTrustedURL(navigationUrl)) {
-            console.warn('[Security] Blocked navigation to:', navigationUrl);
+            log.warn('[Security] Blocked navigation to:', navigationUrl);
             event.preventDefault();
         }
     });
@@ -375,7 +378,7 @@ const createWindow = () => {
             // Open Google links in system browser
             shell.openExternal(url);
         } else {
-            console.warn('[Security] Blocked window open to:', url);
+            log.warn('[Security] Blocked window open to:', url);
         }
         return { action: 'deny' };
     });
@@ -384,16 +387,16 @@ const createWindow = () => {
 app.on('ready', () => {
     // Initialize configuration manager
     configManager.init();
-    console.log('[Googol Vibe] Config paths:', configManager.debugPaths());
+    log.info('[Googol Vibe] Config paths:', configManager.debugPaths());
 
     // Initialize recurrence manager
     recurrenceManager.init();
-    console.log('[Googol Vibe] Recurrence manager initialized');
+    log.info('[Googol Vibe] Recurrence manager initialized');
 
     // Initialize notification manager with saved settings
     const notificationSettings = configManager.getNotificationSettings();
     notificationManager.init(notificationSettings);
-    console.log('[Googol Vibe] Notification manager initialized');
+    log.info('[Googol Vibe] Notification manager initialized');
 
     // Initialize telemetry (opt-in only)
     telemetry.initTelemetry();
@@ -500,7 +503,7 @@ app.on('ready', () => {
 
             return { success: true };
         } catch (error) {
-            console.error('Login failed', error);
+            log.error('Login failed', error);
             return { success: false, error: error.message };
         }
     });
@@ -514,7 +517,7 @@ app.on('ready', () => {
             const res = await service.userinfo.get();
             return res.data;
         } catch (e) {
-            console.error("Profile fetch error", e);
+            log.error("Profile fetch error", e);
             throw e;
         }
     });
@@ -551,12 +554,12 @@ app.on('ready', () => {
                         unread: isUnread
                     });
                 } catch (e) {
-                    console.error('Error fetching email details', e);
+                    log.error('Error fetching email details', e);
                 }
             }));
             return emailList;
         } catch (e) {
-            console.error("Gmail fetch error", e);
+            log.error("Gmail fetch error", e);
             return []; // Return empty array instead of crashing
         }
     });
@@ -583,7 +586,7 @@ app.on('ready', () => {
                 htmlLink: event.htmlLink
             }));
         } catch (e) {
-            console.error("Calendar fetch error", e);
+            log.error("Calendar fetch error", e);
             return [];
         }
     });
@@ -602,7 +605,7 @@ app.on('ready', () => {
             });
             return res.data.files;
         } catch (e) {
-            console.error("Drive fetch error", e);
+            log.error("Drive fetch error", e);
             return [];
         }
     });
@@ -622,7 +625,7 @@ app.on('ready', () => {
             });
             return res.data.files;
         } catch (e) {
-            console.error("Documents fetch error", e);
+            log.error("Documents fetch error", e);
             return [];
         }
     });
@@ -658,7 +661,7 @@ app.on('ready', () => {
                     attendees: event.attendees?.length || 0
                 }));
         } catch (e) {
-            console.error("Meetings fetch error", e);
+            log.error("Meetings fetch error", e);
             return [];
         }
     });
@@ -691,7 +694,7 @@ app.on('ready', () => {
                 }))
             };
         } catch (e) {
-            console.error("Tasks fetch error", e);
+            log.error("Tasks fetch error", e);
             return { taskListId: null, tasks: [] };
         }
     });
@@ -709,7 +712,7 @@ app.on('ready', () => {
             });
             return res.data;
         } catch (e) {
-            console.error("Create task error", e);
+            log.error("Create task error", e);
             throw e;
         }
     });
@@ -728,7 +731,7 @@ app.on('ready', () => {
             });
             return { success: true };
         } catch (e) {
-            console.error("Complete task error", e);
+            log.error("Complete task error", e);
             throw e;
         }
     });
@@ -747,7 +750,7 @@ app.on('ready', () => {
             });
             return res.data;
         } catch (e) {
-            console.error("Update task error", e);
+            log.error("Update task error", e);
             throw e;
         }
     });
@@ -762,7 +765,7 @@ app.on('ready', () => {
             await tasks.tasks.delete({ tasklist: taskListId, task: taskId });
             return { success: true };
         } catch (e) {
-            console.error("Delete task error", e);
+            log.error("Delete task error", e);
             throw e;
         }
     });
@@ -908,7 +911,7 @@ app.on('ready', () => {
 
         // Security: Validate docId contains only safe characters (alphanumeric, hyphens, underscores)
         if (!docId || !/^[a-zA-Z0-9_-]+$/.test(docId)) {
-            console.warn('[Security] Blocked switch-to-edit with invalid docId:', docId);
+            log.warn('[Security] Blocked switch-to-edit with invalid docId:', docId);
             return;
         }
 
@@ -928,7 +931,7 @@ app.on('ready', () => {
         // Security: Only allow trusted Google domains in the BrowserView
         // The BrowserView shares the persist:googleos session (Google auth cookies)
         if (!isTrustedURL(url)) {
-            console.warn('[Security] Blocked view-content for untrusted URL:', url);
+            log.warn('[Security] Blocked view-content for untrusted URL:', url);
             return;
         }
 
@@ -1057,7 +1060,7 @@ app.on('ready', () => {
                 return "I can help you check your **emails**, **schedule**, **files**, or **tasks**. Try asking 'What meetings do I have?' or 'Show my tasks'.";
             }
         } catch (e) {
-            console.error("Agent Error", e);
+            log.error("Agent Error", e);
             throw new Error("Sorry, I encountered an error talking to Google services: " + e.message);
         }
     });
@@ -1075,7 +1078,7 @@ app.on('ready', () => {
                 await fs.promises.unlink(legacyPath);
             }
         } catch (e) {
-            console.error("Error removing token:", e);
+            log.error("Error removing token:", e);
         }
 
         try {
@@ -1088,7 +1091,7 @@ app.on('ready', () => {
             const authSession = require('electron').session.fromPartition('persist:googleos');
             await authSession.clearStorageData();
         } catch (e) {
-            console.error("Error clearing session", e);
+            log.error("Error clearing session", e);
         }
 
         // Reset onboarding state
