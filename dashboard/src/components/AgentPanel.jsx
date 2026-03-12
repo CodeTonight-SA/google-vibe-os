@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Send, Terminal, ChevronRight } from 'lucide-react';
-import WaitlistModal from './WaitlistModal';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Send, Terminal, ChevronRight, RotateCcw, Settings } from 'lucide-react';
 
-// Help text
+// ============================================================
+// Help text & Slash Command Infrastructure (unchanged)
+// ============================================================
+
 const HELP_TEXT = `VIBE TERMINAL
 ────────────────────────────────────────
 /inbox [n]     List unread emails (default 5)
@@ -13,14 +15,12 @@ const HELP_TEXT = `VIBE TERMINAL
 
 Anything else is sent to the AI agent.`;
 
-// Command parser
 const parseCommand = (input) => {
     if (!input.startsWith('/')) return null;
     const parts = input.trim().slice(1).split(/\s+/);
     return { cmd: parts[0].toLowerCase(), args: parts.slice(1) };
 };
 
-// Time formatter
 const formatTime = (date) => {
     const now = new Date();
     const diff = now - date;
@@ -32,7 +32,6 @@ const formatTime = (date) => {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-// Inbox formatter
 const formatInbox = (emails, limit = 5) => {
     const list = emails.slice(0, limit);
     if (!list.length) return 'INBOX\n────────────────────────────────────────\nNo unread emails';
@@ -49,7 +48,6 @@ const formatInbox = (emails, limit = 5) => {
     return `INBOX (${emails.length} unread)\n────────────────────────────────────────\n${lines.join('\n\n')}`;
 };
 
-// Calendar formatter
 const formatCalendar = (events, range = 'today') => {
     const now = new Date();
     const filtered = events.filter(e => {
@@ -77,7 +75,6 @@ const formatCalendar = (events, range = 'today') => {
     return `CALENDAR - ${range.toUpperCase()}\n────────────────────────────────────────\n${lines.join('\n')}`;
 };
 
-// Drive formatter
 const formatDrive = (files, limit = 5) => {
     const list = files.slice(0, limit);
     if (!list.length) return 'DRIVE\n────────────────────────────────────────\nNo recent files';
@@ -90,7 +87,6 @@ const formatDrive = (files, limit = 5) => {
     return `DRIVE (${files.length} recent)\n────────────────────────────────────────\n${lines.join('\n')}`;
 };
 
-// Execute command
 const executeCommand = async (cmd, args) => {
     try {
         switch (cmd) {
@@ -122,16 +118,152 @@ const executeCommand = async (cmd, args) => {
     }
 };
 
-const AgentPanel = ({ context }) => {
+// ============================================================
+// Message Styling
+// ============================================================
+
+const getMessageStyle = (role) => {
+    const base = {
+        display: 'block',
+        padding: '10px 14px',
+        borderRadius: 0,
+        color: '#f3f4f6',
+        maxWidth: '100%',
+        fontSize: '0.85rem',
+        whiteSpace: 'pre-wrap',
+        lineHeight: 1.5
+    };
+
+    if (role === 'user') {
+        return { ...base, background: 'var(--accent-brand)' };
+    }
+    if (role === 'system') {
+        return {
+            ...base,
+            background: '#1f2937',
+            fontFamily: 'ui-monospace, "SF Mono", monospace',
+            borderLeft: '2px solid var(--accent-brand)',
+            color: '#d1d5db'
+        };
+    }
+    // agent
+    return {
+        ...base,
+        background: '#374151',
+        fontFamily: 'ui-monospace, "SF Mono", monospace',
+        borderLeft: '2px solid #6b7280'
+    };
+};
+
+// ============================================================
+// AgentPanel Component
+// ============================================================
+
+const AgentPanel = ({ context, onOpenSettings }) => {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState([
-        { role: 'system', text: 'VIBE TERMINAL v1.0\n────────────────────────────────────────\nType /help for commands, or ask anything.' }
+        { role: 'system', text: 'VIBE TERMINAL v2.0\n────────────────────────────────────────\nType /help for commands, or ask anything.' }
     ]);
-    const [showWaitlist, setShowWaitlist] = useState(false);
-    const [pendingQuery, setPendingQuery] = useState('');
 
-    const handleSend = async () => {
-        if (!input.trim()) return;
+    // AI Streaming state
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [streamingText, setStreamingText] = useState('');
+    const [streamStatus, setStreamStatus] = useState('');
+    const [apiKeyConfigured, setApiKeyConfigured] = useState(null); // null = loading
+    const [sessionId, setSessionId] = useState(null);
+
+    // Refs
+    const chatAreaRef = useRef(null);
+    const inputRef = useRef(null);
+    const streamingTextRef = useRef(''); // Mutable ref to avoid stale closures in event handlers
+
+    // ========================================
+    // Initialisation
+    // ========================================
+
+    // Check API key status and create session on mount
+    useEffect(() => {
+        async function init() {
+            try {
+                const [keyStatus, session] = await Promise.all([
+                    window.electronAPI.getAnthropicKeyStatus(),
+                    window.electronAPI.startNewAiSession()
+                ]);
+                setApiKeyConfigured(keyStatus.configured);
+                setSessionId(session.sessionId);
+            } catch (e) {
+                console.error('Agent init failed:', e);
+                setApiKeyConfigured(false);
+            }
+        }
+        init();
+    }, []);
+
+    // ========================================
+    // Stream Event Listeners
+    // ========================================
+
+    useEffect(() => {
+        const handleChunk = (data) => {
+            if (data.status) {
+                setStreamStatus(data.status);
+            }
+            if (data.text) {
+                streamingTextRef.current += data.text;
+                setStreamingText(streamingTextRef.current);
+                setStreamStatus(''); // Clear status when text arrives
+            }
+        };
+
+        const handleEnd = () => {
+            // Finalise: move streaming text into messages array
+            const finalText = streamingTextRef.current;
+            if (finalText.trim()) {
+                setMessages(prev => [...prev, { role: 'agent', text: finalText }]);
+            }
+            setStreamingText('');
+            streamingTextRef.current = '';
+            setStreamStatus('');
+            setIsStreaming(false);
+        };
+
+        const handleError = (data) => {
+            const errorText = streamingTextRef.current
+                ? streamingTextRef.current + '\n\n[Error: ' + (data.error || 'Stream interrupted') + ']'
+                : 'Error: ' + (data.error || 'Something went wrong');
+
+            setMessages(prev => [...prev, { role: 'system', text: errorText }]);
+            setStreamingText('');
+            streamingTextRef.current = '';
+            setStreamStatus('');
+            setIsStreaming(false);
+        };
+
+        window.electronAPI.onAgentStreamChunk(handleChunk);
+        window.electronAPI.onAgentStreamEnd(handleEnd);
+        window.electronAPI.onAgentStreamError(handleError);
+
+        return () => {
+            window.electronAPI.removeAgentStreamListeners();
+        };
+    }, []);
+
+    // ========================================
+    // Auto-scroll on new content
+    // ========================================
+
+    useEffect(() => {
+        if (chatAreaRef.current) {
+            chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+        }
+    }, [messages, streamingText, streamStatus]);
+
+    // ========================================
+    // Send Handler
+    // ========================================
+
+    const handleSend = useCallback(async () => {
+        if (!input.trim() || isStreaming) return;
         const query = input;
         setInput('');
 
@@ -150,71 +282,122 @@ const AgentPanel = ({ context }) => {
                 setMessages(prev => [...prev, { role: 'system', text: output }]);
             }
         } else {
-            // Natural language → Show waitlist for AI premium feature
-            setPendingQuery(query);
-            setShowWaitlist(true);
-            setMessages(prev => [...prev, {
-                role: 'system',
-                text: 'VIBE AI\n────────────────────────────────────────\nAI-powered automation is coming soon.\nJoin the waitlist for early access.'
-            }]);
+            // Natural language → AI agent
+            if (!apiKeyConfigured) {
+                setMessages(prev => [...prev, {
+                    role: 'system',
+                    text: 'AI agent requires an Anthropic API key.\nGo to Settings > AI Configuration to add your key.'
+                }]);
+                return;
+            }
+
+            if (!sessionId) {
+                setMessages(prev => [...prev, {
+                    role: 'system',
+                    text: 'Session not ready. Please wait a moment and try again.'
+                }]);
+                return;
+            }
+
+            // Start streaming
+            setIsStreaming(true);
+            setStreamingText('');
+            streamingTextRef.current = '';
+            setStreamStatus('');
+
+            try {
+                const result = await window.electronAPI.askAgentStream(query, sessionId);
+                if (!result.success && result.error) {
+                    // Handle non-stream errors (e.g., key not configured)
+                    // The error handler above handles stream errors
+                    if (!streamingTextRef.current) {
+                        setMessages(prev => [...prev, { role: 'system', text: 'Error: ' + result.error }]);
+                        setIsStreaming(false);
+                    }
+                }
+            } catch (e) {
+                if (!streamingTextRef.current) {
+                    setMessages(prev => [...prev, { role: 'system', text: 'Error: ' + e.message }]);
+                    setIsStreaming(false);
+                }
+            }
         }
-    };
+    }, [input, isStreaming, apiKeyConfigured, sessionId]);
+
+    // ========================================
+    // New Chat
+    // ========================================
+
+    const handleNewChat = useCallback(async () => {
+        if (isStreaming) return;
+        try {
+            const session = await window.electronAPI.startNewAiSession();
+            setSessionId(session.sessionId);
+            setMessages([{
+                role: 'system',
+                text: 'VIBE TERMINAL v2.0\n────────────────────────────────────────\nNew session started.\nType /help for commands, or ask anything.'
+            }]);
+            setStreamingText('');
+            streamingTextRef.current = '';
+            setStreamStatus('');
+            inputRef.current?.focus();
+        } catch (e) {
+            console.error('Failed to start new session:', e);
+        }
+    }, [isStreaming]);
+
+    // ========================================
+    // Quick Actions
+    // ========================================
 
     const handleQuickAction = (cmd) => {
+        if (isStreaming) return;
         setInput(cmd);
+        inputRef.current?.focus();
     };
 
-    // Message styling based on role
-    const getMessageStyle = (role) => {
-        const base = {
-            display: 'block',
-            padding: '10px 14px',
-            borderRadius: 0,
-            color: '#f3f4f6',
-            maxWidth: '100%',
-            fontSize: '0.85rem',
-            whiteSpace: 'pre-wrap',
-            lineHeight: 1.5
-        };
-
-        if (role === 'user') {
-            return { ...base, background: 'var(--accent-brand)' };
-        }
-        if (role === 'system') {
-            return {
-                ...base,
-                background: '#1f2937',
-                fontFamily: 'ui-monospace, "SF Mono", monospace',
-                borderLeft: '2px solid var(--accent-brand)',
-                color: '#d1d5db'
-            };
-        }
-        // agent
-        return {
-            ...base,
-            background: '#374151',
-            fontFamily: 'ui-monospace, "SF Mono", monospace',
-            borderLeft: '2px solid #6b7280'
-        };
-    };
+    // ========================================
+    // Render
+    // ========================================
 
     return (
-        <>
-        <WaitlistModal
-            isOpen={showWaitlist}
-            onClose={() => setShowWaitlist(false)}
-            userQuery={pendingQuery}
-        />
         <div className="card agent-panel" style={{ height: 'calc(100vh - 140px)' }}>
             <div className="card-header">
                 <div className="card-title">
                     <Terminal size={18} />
                     <span>Vibe Terminal</span>
                 </div>
-                <div className="badge">Active</div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                        onClick={handleNewChat}
+                        disabled={isStreaming}
+                        title="New Chat"
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            borderRadius: '4px',
+                            color: '#9ca3af',
+                            cursor: isStreaming ? 'not-allowed' : 'pointer',
+                            padding: '4px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.75rem',
+                            opacity: isStreaming ? 0.5 : 1,
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => { if (!isStreaming) e.currentTarget.style.borderColor = 'var(--accent-brand)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+                    >
+                        <RotateCcw size={12} />
+                        New
+                    </button>
+                    <div className="badge">{isStreaming ? 'Streaming' : 'Active'}</div>
+                </div>
             </div>
 
-            <div className="agent-chat-area">
+            <div className="agent-chat-area" ref={chatAreaRef}>
+                {/* Rendered messages */}
                 {messages.map((msg, i) => (
                     <div key={i} style={{ marginBottom: '12px', textAlign: 'left' }}>
                         <div style={getMessageStyle(msg.role)}>
@@ -228,21 +411,84 @@ const AgentPanel = ({ context }) => {
                         </div>
                     </div>
                 ))}
+
+                {/* Streaming in-progress message */}
+                {isStreaming && (
+                    <div style={{ marginBottom: '12px', textAlign: 'left' }}>
+                        <div style={getMessageStyle('agent')}>
+                            <span style={{ color: '#6b7280', marginRight: 8 }}>AI&gt;</span>
+                            {streamStatus && !streamingText && (
+                                <span style={{ color: '#f59e0b', fontStyle: 'italic' }}>
+                                    {streamStatus}
+                                </span>
+                            )}
+                            {streamingText || (!streamStatus && (
+                                <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                    Thinking...
+                                </span>
+                            ))}
+                            {streamStatus && streamingText && (
+                                <span style={{ color: '#f59e0b', fontStyle: 'italic', display: 'block', marginTop: '4px', fontSize: '0.8rem' }}>
+                                    {streamStatus}
+                                </span>
+                            )}
+                            <span className="agent-cursor">|</span>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* API key not configured banner */}
+            {apiKeyConfigured === false && (
+                <div style={{
+                    padding: '10px 14px',
+                    background: '#1f2937',
+                    borderTop: '1px solid #374151',
+                    fontSize: '0.8rem',
+                    color: '#9ca3af',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <span>AI requires an API key to work.</span>
+                    {onOpenSettings && (
+                        <button
+                            onClick={onOpenSettings}
+                            style={{
+                                background: 'var(--accent-brand)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 10px',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                        >
+                            <Settings size={12} /> Setup
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div className="agent-input-container">
                 <input
+                    ref={inputRef}
                     type="text"
                     className="agent-input"
-                    placeholder="/help or ask anything..."
+                    placeholder={isStreaming ? 'Waiting for response...' : '/help or ask anything...'}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    disabled={isStreaming}
                 />
                 <button
                     onClick={handleSend}
+                    disabled={isStreaming || !input.trim()}
                     style={{
-                        background: 'var(--accent-brand)',
+                        background: (isStreaming || !input.trim()) ? '#4b5563' : 'var(--accent-brand)',
                         color: 'var(--text-on-accent)',
                         border: 'none',
                         borderRadius: 0,
@@ -251,11 +497,11 @@ const AgentPanel = ({ context }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        cursor: 'pointer',
+                        cursor: (isStreaming || !input.trim()) ? 'not-allowed' : 'pointer',
                         transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={(e) => e.target.style.background = '#c2410c'}
-                    onMouseLeave={(e) => e.target.style.background = 'var(--accent-brand)'}
+                    onMouseEnter={(e) => { if (!isStreaming && input.trim()) e.target.style.background = '#c2410c'; }}
+                    onMouseLeave={(e) => { if (!isStreaming && input.trim()) e.target.style.background = 'var(--accent-brand)'; }}
                 >
                     <Send size={18} />
                 </button>
@@ -273,7 +519,7 @@ const AgentPanel = ({ context }) => {
                 }}>Quick Commands</div>
                 <div
                     className="list-item"
-                    style={{ padding: '10px 0', borderBottom: '1px solid #374151', background: 'transparent', cursor: 'pointer' }}
+                    style={{ padding: '10px 0', borderBottom: '1px solid #374151', background: 'transparent', cursor: isStreaming ? 'not-allowed' : 'pointer', opacity: isStreaming ? 0.5 : 1 }}
                     onClick={() => handleQuickAction('/inbox')}
                 >
                     <ChevronRight size={14} color="var(--accent-brand)" style={{ marginRight: '8px' }} />
@@ -281,7 +527,7 @@ const AgentPanel = ({ context }) => {
                 </div>
                 <div
                     className="list-item"
-                    style={{ padding: '10px 0', borderBottom: '1px solid #374151', background: 'transparent', cursor: 'pointer' }}
+                    style={{ padding: '10px 0', borderBottom: '1px solid #374151', background: 'transparent', cursor: isStreaming ? 'not-allowed' : 'pointer', opacity: isStreaming ? 0.5 : 1 }}
                     onClick={() => handleQuickAction('/cal')}
                 >
                     <ChevronRight size={14} color="var(--accent-brand)" style={{ marginRight: '8px' }} />
@@ -289,7 +535,7 @@ const AgentPanel = ({ context }) => {
                 </div>
                 <div
                     className="list-item"
-                    style={{ padding: '10px 0', borderBottom: 'none', background: 'transparent', cursor: 'pointer' }}
+                    style={{ padding: '10px 0', borderBottom: 'none', background: 'transparent', cursor: isStreaming ? 'not-allowed' : 'pointer', opacity: isStreaming ? 0.5 : 1 }}
                     onClick={() => handleQuickAction('/drive')}
                 >
                     <ChevronRight size={14} color="var(--accent-brand)" style={{ marginRight: '8px' }} />
@@ -297,7 +543,6 @@ const AgentPanel = ({ context }) => {
                 </div>
             </div>
         </div>
-        </>
     );
 };
 

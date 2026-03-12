@@ -1237,6 +1237,24 @@ body {
     box-shadow: none;
 }
 
+.agent-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Agent streaming cursor */
+.agent-cursor {
+    display: inline;
+    color: var(--accent-brand);
+    font-weight: bold;
+    animation: agent-cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes agent-cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
 /* Buttons */
 .btn-primary {
     background: var(--text-heading);

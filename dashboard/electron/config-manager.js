@@ -9,6 +9,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { app } = require('electron');
+const log = require('./logger');
 
 // App constants
 const APP_NAME = 'googol-vibe';
@@ -32,7 +33,7 @@ class ConfigManager {
         this.config = this._loadConfig();
         this._initialized = true;
 
-        console.log(`[ConfigManager] Initialized: ${this.configDir}`);
+        log.info(`[ConfigManager] Initialized: ${this.configDir}`);
     }
 
     /**
@@ -83,7 +84,7 @@ class ConfigManager {
             try {
                 return JSON.parse(fs.readFileSync(configPath, 'utf8'));
             } catch (e) {
-                console.error('[ConfigManager] Error loading config:', e);
+                log.error('[ConfigManager] Error loading config:', e);
             }
         }
 
@@ -137,7 +138,7 @@ class ConfigManager {
         // Legacy location (backwards compatibility)
         const legacyPath = this._findLegacyCredentials();
         if (legacyPath) {
-            console.log(`[ConfigManager] Using legacy credentials: ${legacyPath}`);
+            log.info(`[ConfigManager] Using legacy credentials: ${legacyPath}`);
             return legacyPath;
         }
 
@@ -274,7 +275,7 @@ class ConfigManager {
         const destPath = path.join(this.configDir, 'credentials.json');
         await fs.promises.writeFile(destPath, content);
 
-        console.log(`[ConfigManager] Credentials imported to: ${destPath}`);
+        log.info(`[ConfigManager] Credentials imported to: ${destPath}`);
         return destPath;
     }
 
@@ -294,7 +295,7 @@ class ConfigManager {
         if (fs.existsSync(legacyTokenPath)) {
             const content = await fs.promises.readFile(legacyTokenPath);
             await fs.promises.writeFile(newTokenPath, content);
-            console.log(`[ConfigManager] Token migrated to: ${newTokenPath}`);
+            log.info(`[ConfigManager] Token migrated to: ${newTokenPath}`);
             return true;
         }
 

@@ -5,6 +5,7 @@
 
 const { Notification, nativeImage, app } = require('electron');
 const path = require('path');
+const log = require('./logger');
 
 /**
  * Safe logging wrapper - prevents EPIPE crashes when stdout is closed
@@ -12,7 +13,7 @@ const path = require('path');
 function safeLog(...args) {
     try {
         if (process.stdout && process.stdout.writable) {
-            console.log(...args);
+            log.info(...args);
         }
     } catch (err) {
         // Silently ignore EPIPE errors - stdout/stderr pipe closed
