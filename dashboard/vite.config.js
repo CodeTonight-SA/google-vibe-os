@@ -7,5 +7,10 @@ export default defineConfig({
     base: './', // Relative paths for Electron file:// protocol
     server: {
         port: 9000
+    },
+    test: {
+        environment: 'jsdom',
+        globals: true,
+        setupFiles: ['./src/test-setup.js']
     }
 })

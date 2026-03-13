@@ -105,6 +105,9 @@ function App() {
             setLoadingStates({ emails: true, events: true, files: true, documents: true, meetings: true, tasks: true });
 
             const profileData = await window.electronAPI.getProfile();
+            if (profileData?.error) {
+                throw new Error(profileData.error);
+            }
             setProfile(profileData);
             setIsAuthenticated(true);
 
@@ -428,20 +431,20 @@ function App() {
             return;
         }
 
-        try {
-            const newTask = await window.electronAPI.createTask(taskListId, newTaskTitle.trim(), null);
-            setNewTaskTitle('');
-            // Refresh tasks
-            const taskData = await window.electronAPI.getTasks();
-            setTasks(taskData.tasks || []);
-            // Open modal immediately for notes entry
-            if (newTask) {
-                setSelectedTask(newTask);
-                setIsTaskModalOpen(true);
-            }
-        } catch (e) {
-            console.error("Failed to create task", e);
+        const newTask = await window.electronAPI.createTask(taskListId, newTaskTitle.trim(), null);
+        if (newTask?.error) {
+            console.error("Failed to create task", newTask.error);
             addToast('Failed to create task', 'error');
+            return;
+        }
+        setNewTaskTitle('');
+        // Refresh tasks
+        const taskData = await window.electronAPI.getTasks();
+        setTasks(taskData.tasks || []);
+        // Open modal immediately for notes entry
+        if (newTask) {
+            setSelectedTask(newTask);
+            setIsTaskModalOpen(true);
         }
     };
 
@@ -457,61 +460,57 @@ function App() {
 
     const handleSaveTask = async (taskId, updates) => {
         if (!taskListId) return;
-        try {
-            const updatedTask = await window.electronAPI.updateTask(taskListId, taskId, updates);
-            // Update local state with the returned task data
-            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedTask } : t));
-        } catch (e) {
-            console.error("Failed to update task", e);
+        const updatedTask = await window.electronAPI.updateTask(taskListId, taskId, updates);
+        if (updatedTask?.error) {
+            console.error("Failed to update task", updatedTask.error);
             addToast('Failed to save task changes', 'error');
-            throw e;
+            throw new Error(updatedTask.error);
         }
+        // Update local state with the returned task data
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedTask } : t));
     };
 
     const handleCompleteTask = async (taskId) => {
         if (!taskListId) return;
-        try {
-            await window.electronAPI.completeTask(taskListId, taskId);
-            // Remove from local state
-            setTasks(prev => prev.filter(t => t.id !== taskId));
-        } catch (e) {
-            console.error("Failed to complete task", e);
+        const result = await window.electronAPI.completeTask(taskListId, taskId);
+        if (result?.error) {
+            console.error("Failed to complete task", result.error);
             addToast('Failed to complete task', 'error');
-            throw e;
+            throw new Error(result.error);
         }
+        // Remove from local state
+        setTasks(prev => prev.filter(t => t.id !== taskId));
     };
 
     const handleDeleteTask = async (taskId) => {
         if (!taskListId) return;
-        try {
-            await window.electronAPI.deleteTask(taskListId, taskId);
-            setTasks(prev => prev.filter(t => t.id !== taskId));
-        } catch (e) {
-            console.error("Failed to delete task", e);
+        const result = await window.electronAPI.deleteTask(taskListId, taskId);
+        if (result?.error) {
+            console.error("Failed to delete task", result.error);
             addToast('Failed to delete task', 'error');
-            throw e;
+            throw new Error(result.error);
         }
+        setTasks(prev => prev.filter(t => t.id !== taskId));
     };
 
     const handleSetRecurrence = async (taskId, rruleString) => {
         if (!taskListId || !selectedTask) return;
-        try {
-            const result = await window.electronAPI.setTaskRecurrence(
-                taskListId,
-                taskId,
-                selectedTask.title,
-                selectedTask.notes || '',
-                rruleString
-            );
-            // Refresh recurrence rules
-            const rules = await window.electronAPI.getRecurrenceRules();
-            setRecurrenceRules(rules || []);
-            return result;
-        } catch (e) {
-            console.error("Failed to set recurrence", e);
+        const result = await window.electronAPI.setTaskRecurrence(
+            taskListId,
+            taskId,
+            selectedTask.title,
+            selectedTask.notes || '',
+            rruleString
+        );
+        if (result?.error) {
+            console.error("Failed to set recurrence", result.error);
             addToast('Failed to set task recurrence', 'error');
-            throw e;
+            throw new Error(result.error);
         }
+        // Refresh recurrence rules
+        const rules = await window.electronAPI.getRecurrenceRules();
+        setRecurrenceRules(rules || []);
+        return result;
     };
 
     // Helper to check if a task has a recurrence rule

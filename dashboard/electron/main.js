@@ -13,6 +13,7 @@ const secureStorage = require('./secure-storage');
 const aiAgent = require('./ai-agent');
 const aiMemory = require('./ai-memory');
 const log = require('./logger');
+const { safeHandle } = require('./ipc-safety');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -554,20 +555,16 @@ app.on('ready', () => {
     // Onboarding IPC Handlers
     // ========================================
 
-    ipcMain.handle('get-onboarding-state', async () => {
+    safeHandle('get-onboarding-state', async () => {
         return configManager.getOnboardingState();
     });
 
-    ipcMain.handle('import-credentials', async (event, filePath) => {
-        try {
-            await configManager.importCredentials(filePath);
-            return { success: true };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
+    safeHandle('import-credentials', async (event, filePath) => {
+        await configManager.importCredentials(filePath);
+        return { success: true };
     });
 
-    ipcMain.handle('select-credentials-file', async () => {
+    safeHandle('select-credentials-file', async () => {
         const result = await dialog.showOpenDialog(mainWindow, {
             title: 'Select credentials.json',
             filters: [{ name: 'JSON', extensions: ['json'] }],
@@ -578,20 +575,16 @@ app.on('ready', () => {
             return { success: false, canceled: true };
         }
 
-        try {
-            await configManager.importCredentials(result.filePaths[0]);
-            return { success: true, path: result.filePaths[0] };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
+        await configManager.importCredentials(result.filePaths[0]);
+        return { success: true, path: result.filePaths[0] };
     });
 
-    ipcMain.handle('update-onboarding', async (event, updates) => {
+    safeHandle('update-onboarding', async (event, updates) => {
         configManager.updateOnboarding(updates);
         return { success: true };
     });
 
-    ipcMain.handle('get-config-paths', async () => {
+    safeHandle('get-config-paths', async () => {
         return configManager.debugPaths();
     });
 
@@ -599,13 +592,13 @@ app.on('ready', () => {
     // Telemetry IPC Handlers
     // ========================================
 
-    ipcMain.handle('get-telemetry-status', async () => {
+    safeHandle('get-telemetry-status', async () => {
         return {
             enabled: telemetry.isEnabled()
         };
     });
 
-    ipcMain.handle('set-telemetry', async (event, enabled) => {
+    safeHandle('set-telemetry', async (event, enabled) => {
         if (enabled) {
             telemetry.enableTelemetry();
         } else {
@@ -618,285 +611,222 @@ app.on('ready', () => {
     // Auth IPC Handlers
     // ========================================
 
-    ipcMain.handle('google-login', async () => {
+    safeHandle('google-login', async () => {
+        const client = await createOAuthClient();
+        authClient = await authenticateWithLoopback(client);
+        await saveCredentials(authClient);
+
+        // Update onboarding state with connected email
         try {
-            const client = await createOAuthClient();
-            authClient = await authenticateWithLoopback(client);
-            await saveCredentials(authClient);
-
-            // Update onboarding state with connected email
-            try {
-                const service = google.oauth2({ version: 'v2', auth: authClient });
-                const res = await service.userinfo.get();
-                configManager.updateOnboarding({
-                    onboardingComplete: true,
-                    connectedEmail: res.data.email
-                });
-            } catch (e) {
-                // Still mark as complete even if we can't get email
-                configManager.updateOnboarding({ onboardingComplete: true });
-            }
-
-            // Start sync controller after login
-            syncController.setAuthClient(authClient);
-            syncController.setMainWindow(mainWindow);
-            syncController.start();
-
-            // Update AI agent with new auth client and profile
-            aiAgent.setAuthClient(authClient);
-            try {
-                const svc = google.oauth2({ version: 'v2', auth: authClient });
-                const profileRes = await svc.userinfo.get();
-                aiAgent.setUserProfile(profileRes.data);
-            } catch { /* non-critical */ }
-
-            return { success: true };
-        } catch (error) {
-            log.error('Login failed', error);
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('get-profile', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
-
             const service = google.oauth2({ version: 'v2', auth: authClient });
             const res = await service.userinfo.get();
-            return res.data;
+            configManager.updateOnboarding({
+                onboardingComplete: true,
+                connectedEmail: res.data.email
+            });
         } catch (e) {
-            log.error("Profile fetch error", e);
-            throw e;
+            // Still mark as complete even if we can't get email
+            configManager.updateOnboarding({ onboardingComplete: true });
         }
+
+        // Start sync controller after login
+        syncController.setAuthClient(authClient);
+        syncController.setMainWindow(mainWindow);
+        syncController.start();
+
+        // Update AI agent with new auth client and profile
+        aiAgent.setAuthClient(authClient);
+        try {
+            const svc = google.oauth2({ version: 'v2', auth: authClient });
+            const profileRes = await svc.userinfo.get();
+            aiAgent.setUserProfile(profileRes.data);
+        } catch { /* non-critical */ }
+
+        return { success: true };
     });
 
-    ipcMain.handle('get-gmail', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
-            return await fetchGmail(authClient, 10);
-        } catch (e) {
-            log.error("Gmail fetch error", e);
-            return [];
-        }
+    safeHandle('get-profile', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
+
+        const service = google.oauth2({ version: 'v2', auth: authClient });
+        const res = await service.userinfo.get();
+        return res.data;
     });
 
-    ipcMain.handle('get-calendar', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
-            return await fetchCalendar(authClient, 14);
-        } catch (e) {
-            log.error("Calendar fetch error", e);
-            return [];
-        }
-    });
+    safeHandle('get-gmail', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
+        return await fetchGmail(authClient, 10);
+    }, { fallback: [] });
 
-    ipcMain.handle('get-drive', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
-            return await fetchDrive(authClient, 12, 'all');
-        } catch (e) {
-            log.error("Drive fetch error", e);
-            return [];
-        }
-    });
+    safeHandle('get-calendar', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
+        return await fetchCalendar(authClient, 14);
+    }, { fallback: [] });
+
+    safeHandle('get-drive', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
+        return await fetchDrive(authClient, 12, 'all');
+    }, { fallback: [] });
 
     // Documents (Docs/Sheets/Slides) - uses type filter via shared helper
-    ipcMain.handle('get-documents', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
-            // Fetch all document types (docs, sheets, slides) - the original handler
-            // used a compound mimeType query. The shared helper uses individual types.
-            // For backwards compat, fetch all three and combine:
-            const drive = google.drive({ version: 'v3', auth: authClient });
-            const res = await drive.files.list({
-                pageSize: 12,
-                q: "(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation') and trashed = false",
-                orderBy: "modifiedTime desc",
-                fields: "files(id, name, mimeType, modifiedTime, iconLink, webViewLink, thumbnailLink)"
-            });
-            return res.data.files;
-        } catch (e) {
-            log.error("Documents fetch error", e);
-            return [];
-        }
-    });
+    safeHandle('get-documents', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
+        const drive = google.drive({ version: 'v3', auth: authClient });
+        const res = await drive.files.list({
+            pageSize: 12,
+            q: "(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation') and trashed = false",
+            orderBy: "modifiedTime desc",
+            fields: "files(id, name, mimeType, modifiedTime, iconLink, webViewLink, thumbnailLink)"
+        });
+        return res.data.files;
+    }, { fallback: [] });
 
     // Meetings (Calendar events with Meet links)
-    ipcMain.handle('get-meetings', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
+    safeHandle('get-meetings', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
 
-            const calendar = google.calendar({ version: 'v3', auth: authClient });
-            const now = new Date().toISOString();
-            const endOfWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const calendar = google.calendar({ version: 'v3', auth: authClient });
+        const now = new Date().toISOString();
+        const endOfWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-            const res = await calendar.events.list({
-                calendarId: 'primary',
-                timeMin: now,
-                timeMax: endOfWeek,
-                maxResults: 10,
-                singleEvents: true,
-                orderBy: 'startTime',
-                conferenceDataVersion: 1
-            });
+        const res = await calendar.events.list({
+            calendarId: 'primary',
+            timeMin: now,
+            timeMax: endOfWeek,
+            maxResults: 10,
+            singleEvents: true,
+            orderBy: 'startTime',
+            conferenceDataVersion: 1
+        });
 
-            return (res.data.items || [])
-                .filter(e => e.conferenceData?.entryPoints?.some(ep => ep.entryPointType === 'video'))
-                .map(event => ({
-                    id: event.id,
-                    summary: event.summary || 'No Title',
-                    start: event.start.dateTime || event.start.date,
-                    end: event.end.dateTime || event.end.date,
-                    meetLink: event.conferenceData.entryPoints.find(ep => ep.entryPointType === 'video')?.uri,
-                    attendees: event.attendees?.length || 0
-                }));
-        } catch (e) {
-            log.error("Meetings fetch error", e);
-            return [];
-        }
-    });
+        return (res.data.items || [])
+            .filter(e => e.conferenceData?.entryPoints?.some(ep => ep.entryPointType === 'video'))
+            .map(event => ({
+                id: event.id,
+                summary: event.summary || 'No Title',
+                start: event.start.dateTime || event.start.date,
+                end: event.end.dateTime || event.end.date,
+                meetLink: event.conferenceData.entryPoints.find(ep => ep.entryPointType === 'video')?.uri,
+                attendees: event.attendees?.length || 0
+            }));
+    }, { fallback: [] });
 
     // Tasks - GET
-    ipcMain.handle('get-tasks', async () => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
-            return await fetchTasks(authClient, 20);
-        } catch (e) {
-            log.error("Tasks fetch error", e);
-            return { taskListId: null, tasks: [] };
-        }
-    });
+    safeHandle('get-tasks', async () => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
+        return await fetchTasks(authClient, 20);
+    }, { fallback: { taskListId: null, tasks: [] } });
 
     // Tasks - CREATE
-    ipcMain.handle('create-task', async (event, { taskListId, title, due }) => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
+    safeHandle('create-task', async (event, { taskListId, title, due }) => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
 
-            const tasks = google.tasks({ version: 'v1', auth: authClient });
-            const res = await tasks.tasks.insert({
-                tasklist: taskListId,
-                requestBody: { title, due }
-            });
-            return res.data;
-        } catch (e) {
-            log.error("Create task error", e);
-            throw e;
-        }
+        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        const res = await tasks.tasks.insert({
+            tasklist: taskListId,
+            requestBody: { title, due }
+        });
+        return res.data;
     });
 
     // Tasks - COMPLETE
-    ipcMain.handle('complete-task', async (event, { taskListId, taskId }) => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
+    safeHandle('complete-task', async (event, { taskListId, taskId }) => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
 
-            const tasks = google.tasks({ version: 'v1', auth: authClient });
-            await tasks.tasks.patch({
-                tasklist: taskListId,
-                task: taskId,
-                requestBody: { status: 'completed' }
-            });
-            return { success: true };
-        } catch (e) {
-            log.error("Complete task error", e);
-            throw e;
-        }
+        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        await tasks.tasks.patch({
+            tasklist: taskListId,
+            task: taskId,
+            requestBody: { status: 'completed' }
+        });
+        return { success: true };
     });
 
     // Tasks - UPDATE (for notes, title, due date)
-    ipcMain.handle('update-task', async (event, { taskListId, taskId, updates }) => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
+    safeHandle('update-task', async (event, { taskListId, taskId, updates }) => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
 
-            const tasks = google.tasks({ version: 'v1', auth: authClient });
-            const res = await tasks.tasks.patch({
-                tasklist: taskListId,
-                task: taskId,
-                requestBody: updates
-            });
-            return res.data;
-        } catch (e) {
-            log.error("Update task error", e);
-            throw e;
-        }
+        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        const res = await tasks.tasks.patch({
+            tasklist: taskListId,
+            task: taskId,
+            requestBody: updates
+        });
+        return res.data;
     });
 
     // Tasks - DELETE
-    ipcMain.handle('delete-task', async (event, { taskListId, taskId }) => {
-        try {
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) throw new Error('Not authenticated');
+    safeHandle('delete-task', async (event, { taskListId, taskId }) => {
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (!authClient) throw new Error('Not authenticated');
 
-            const tasks = google.tasks({ version: 'v1', auth: authClient });
-            await tasks.tasks.delete({ tasklist: taskListId, task: taskId });
-            return { success: true };
-        } catch (e) {
-            log.error("Delete task error", e);
-            throw e;
-        }
+        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        await tasks.tasks.delete({ tasklist: taskListId, task: taskId });
+        return { success: true };
     });
 
     // ========================================
     // Notification IPC Handlers
     // ========================================
 
-    ipcMain.handle('get-notification-settings', async () => {
+    safeHandle('get-notification-settings', async () => {
         return notificationManager.getSettings();
     });
 
-    ipcMain.handle('update-notification-settings', async (event, updates) => {
+    safeHandle('update-notification-settings', async (event, updates) => {
         notificationManager.updateSettings(updates);
         configManager.updateNotificationSettings(updates);
         return notificationManager.getSettings();
     });
 
-    ipcMain.handle('show-notification', async (event, options) => {
+    safeHandle('show-notification', async (event, options) => {
         return notificationManager.show(options) !== null;
     });
 
-    ipcMain.handle('get-scheduled-notifications', async () => {
+    safeHandle('get-scheduled-notifications', async () => {
         return notificationManager.getScheduled();
     });
 
-    ipcMain.handle('schedule-task-reminders', async (event, { tasks }) => {
+    safeHandle('schedule-task-reminders', async (event, { tasks }) => {
         notificationManager.scheduleTaskReminders(tasks);
         return { success: true, scheduled: notificationManager.getScheduled().length };
     });
 
-    ipcMain.handle('schedule-calendar-reminders', async (event, { events }) => {
+    safeHandle('schedule-calendar-reminders', async (event, { events }) => {
         notificationManager.scheduleCalendarReminders(events);
         return { success: true, scheduled: notificationManager.getScheduled().length };
     });
 
-    ipcMain.handle('schedule-meeting-reminders', async (event, { meetings }) => {
+    safeHandle('schedule-meeting-reminders', async (event, { meetings }) => {
         notificationManager.scheduleMeetingReminders(meetings);
         return { success: true, scheduled: notificationManager.getScheduled().length };
     });
 
-    ipcMain.handle('cancel-notification', async (event, { id }) => {
+    safeHandle('cancel-notification', async (event, { id }) => {
         notificationManager.cancel(id);
         return { success: true };
     });
 
-    ipcMain.handle('cancel-all-notifications', async () => {
+    safeHandle('cancel-all-notifications', async () => {
         notificationManager.cancelAll();
         return { success: true };
     });
 
-    ipcMain.handle('notification-supported', async () => {
+    safeHandle('notification-supported', async () => {
         return notificationManager.isSupported();
     });
 
-    ipcMain.handle('sync-notification-reminders', async () => {
+    safeHandle('sync-notification-reminders', async () => {
         await syncController.syncAll();
         return { success: true, scheduled: notificationManager.getScheduled().length };
     });
@@ -905,16 +835,16 @@ app.on('ready', () => {
     // Sync Controller IPC Handlers
     // ========================================
 
-    ipcMain.handle('get-sync-status', async () => {
+    safeHandle('get-sync-status', async () => {
         return syncController.getStatus();
     });
 
-    ipcMain.handle('force-sync', async (event, { service }) => {
+    safeHandle('force-sync', async (event, { service }) => {
         await syncController.forceSync(service || 'all');
         return syncController.getStatus();
     });
 
-    ipcMain.handle('reset-new-item-counts', async () => {
+    safeHandle('reset-new-item-counts', async () => {
         syncController.resetNewItemCounts();
         return { success: true };
     });
@@ -923,38 +853,38 @@ app.on('ready', () => {
     // Recurrence IPC Handlers
     // ========================================
 
-    ipcMain.handle('get-recurrence-rules', async () => {
+    safeHandle('get-recurrence-rules', async () => {
         return recurrenceManager.getAllRules();
-    });
+    }, { fallback: [] });
 
-    ipcMain.handle('get-recurrence-rule', async (event, { ruleId }) => {
+    safeHandle('get-recurrence-rule', async (event, { ruleId }) => {
         return recurrenceManager.getRule(ruleId);
     });
 
-    ipcMain.handle('create-recurrence-rule', async (event, { title, notes, rruleString, taskListId }) => {
+    safeHandle('create-recurrence-rule', async (event, { title, notes, rruleString, taskListId }) => {
         const rule = recurrenceManager.createRule({ title, notes, rruleString, taskListId });
         // Trigger immediate check if task is due now
         setTimeout(() => checkAndGenerateRecurringTasks(), 1000);
         return rule;
     });
 
-    ipcMain.handle('update-recurrence-rule', async (event, { ruleId, updates }) => {
+    safeHandle('update-recurrence-rule', async (event, { ruleId, updates }) => {
         return recurrenceManager.updateRule(ruleId, updates);
     });
 
-    ipcMain.handle('delete-recurrence-rule', async (event, { ruleId }) => {
+    safeHandle('delete-recurrence-rule', async (event, { ruleId }) => {
         recurrenceManager.deleteRule(ruleId);
         return { success: true };
     });
 
-    ipcMain.handle('get-rule-for-task', async (event, { taskId }) => {
+    safeHandle('get-rule-for-task', async (event, { taskId }) => {
         // Find rule that might be associated with this task
         // We track this via task title matching for now
         const rules = recurrenceManager.getAllRules();
         return rules.find(r => r.lastGeneratedTaskId === taskId) || null;
     });
 
-    ipcMain.handle('set-task-recurrence', async (event, { taskListId, taskId, title, notes, rruleString }) => {
+    safeHandle('set-task-recurrence', async (event, { taskListId, taskId, title, notes, rruleString }) => {
         if (!rruleString) {
             // Remove recurrence - find and delete any matching rule
             const rules = recurrenceManager.getAllRules();
@@ -981,7 +911,7 @@ app.on('ready', () => {
     });
 
     // Switch document to edit mode
-    ipcMain.handle('switch-to-edit', async (event, { docId, docType }) => {
+    safeHandle('switch-to-edit', async (event, { docId, docType }) => {
         if (!contentView) return;
 
         const editUrls = {
@@ -995,7 +925,7 @@ app.on('ready', () => {
         }
     });
 
-    ipcMain.handle('view-content', async (event, { url, type }) => {
+    safeHandle('view-content', async (event, { url, type }) => {
         // Security: Only allow trusted Google domains in the BrowserView
         // The BrowserView shares the persist:googleos session (Google auth cookies)
         if (!isTrustedURL(url)) {
@@ -1032,10 +962,9 @@ app.on('ready', () => {
         mainWindow.webContents.send('content-view-opened');
     });
 
-    ipcMain.handle('close-content', () => {
+    safeHandle('close-content', async () => {
         if (contentView) {
             mainWindow.removeBrowserView(contentView);
-            // contentView.webContents.destroy(); // Optional, depending on if we want to cache state
             contentView = null;
             mainWindow.webContents.send('content-view-closed');
         }
@@ -1046,76 +975,60 @@ app.on('ready', () => {
     // ========================================
 
     // Streaming AI chat - main entry point
-    ipcMain.handle('ask-agent-stream', async (event, { message, sessionId }) => {
-        try {
-            // Ensure Google auth is available for tools
-            if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (authClient) {
-                aiAgent.setAuthClient(authClient);
-            }
-
-            await aiAgent.chat(message, sessionId);
-            return { success: true };
-        } catch (e) {
-            log.error('[AI Agent] Chat error:', e.message);
-            // Error event already sent by aiAgent.chat() for stream errors
-            return { success: false, error: e.message };
+    safeHandle('ask-agent-stream', async (event, { message, sessionId }) => {
+        // Ensure Google auth is available for tools
+        if (!authClient) authClient = await loadSavedCredentialsIfExist();
+        if (authClient) {
+            aiAgent.setAuthClient(authClient);
         }
+
+        await aiAgent.chat(message, sessionId);
+        return { success: true };
     });
 
     // API Key Management
-    ipcMain.handle('save-anthropic-key', async (event, key) => {
-        try {
-            secureStorage.saveKey(key);
-            aiAgent.refreshClient();
-            return { success: true };
-        } catch (e) {
-            log.error('[AI Agent] Failed to save key:', e.message);
-            return { success: false, error: e.message };
-        }
+    safeHandle('save-anthropic-key', async (event, key) => {
+        secureStorage.saveKey(key);
+        aiAgent.refreshClient();
+        return { success: true };
     });
 
-    ipcMain.handle('get-anthropic-key-status', async () => {
+    safeHandle('get-anthropic-key-status', async () => {
         return { configured: secureStorage.hasKey() };
     });
 
-    ipcMain.handle('test-anthropic-key', async () => {
+    safeHandle('test-anthropic-key', async () => {
         return await aiAgent.testApiKey();
     });
 
-    ipcMain.handle('clear-anthropic-key', async () => {
-        try {
-            secureStorage.deleteKey();
-            aiAgent.refreshClient(); // Will set client to null
-            return { success: true };
-        } catch (e) {
-            log.error('[AI Agent] Failed to clear key:', e.message);
-            return { success: false, error: e.message };
-        }
+    safeHandle('clear-anthropic-key', async () => {
+        secureStorage.deleteKey();
+        aiAgent.refreshClient(); // Will set client to null
+        return { success: true };
     });
 
     // Session History Management
-    ipcMain.handle('get-ai-sessions', async () => {
+    safeHandle('get-ai-sessions', async () => {
         return aiMemory.getSessions();
     });
 
-    ipcMain.handle('clear-ai-history', async () => {
+    safeHandle('clear-ai-history', async () => {
         aiMemory.clearAll();
         return { success: true };
     });
 
-    ipcMain.handle('start-new-ai-session', async () => {
+    safeHandle('start-new-ai-session', async () => {
         return aiMemory.startNewSession();
     });
 
     // Open a URL in the system browser (used for external links like API key console)
-    ipcMain.handle('open-external', async (event, url) => {
-        if (typeof url === 'string' && url.startsWith('https://')) {
-            shell.openExternal(url);
+    safeHandle('open-external', async (event, urlToOpen) => {
+        if (typeof urlToOpen === 'string' && urlToOpen.startsWith('https://')) {
+            shell.openExternal(urlToOpen);
         }
     });
 
-    ipcMain.handle('logout', async () => {
+    safeHandle('logout', async () => {
         try {
             // Remove token from new location
             const tokenPath = configManager.getTokenPath();

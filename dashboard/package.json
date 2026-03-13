@@ -24,7 +24,9 @@
         "build:mac": "vite build && electron-builder --mac -p never",
         "build:win": "vite build && electron-builder --win -p never",
         "build:linux": "vite build && electron-builder --linux -p never",
-        "build:all": "vite build && electron-builder -mwl -p never"
+        "build:all": "vite build && electron-builder -mwl -p never",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@anthropic-ai/sdk": "^0.78.0",
@@ -54,7 +56,11 @@
         "eslint-plugin-react-refresh": "^0.4.16",
         "globals": "^15.14.0",
         "server-destroy": "^1.0.1",
-        "vite": "^6.0.5"
+        "vite": "^6.0.5",
+        "@testing-library/react": "^16.0.0",
+        "@testing-library/jest-dom": "^6.0.0",
+        "jsdom": "^25.0.0",
+        "vitest": "^3.0.0"
     },
     "build": {
         "productName": "Googol Vibe",
