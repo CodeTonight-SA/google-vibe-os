@@ -127,7 +127,8 @@ describe('ConfigManager', () => {
 
     it('uses token dir env var when set', () => {
       process.env.GOOGLE_TOKEN_DIR = '/custom/tokens'
-      expect(configManager.getTokenPath()).toBe('/custom/tokens/token_electron.json')
+      const expected = path.join('/custom/tokens', 'token_electron.json')
+      expect(configManager.getTokenPath()).toBe(expected)
     })
   })
 
