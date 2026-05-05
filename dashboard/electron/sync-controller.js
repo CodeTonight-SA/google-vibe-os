@@ -11,6 +11,7 @@
 
 const { google } = require('googleapis');
 const notificationManager = require('./notification-manager');
+const logger = require('./logger');
 
 // Sync intervals (ms) - Aggressive polling for real-time feel
 const SYNC_INTERVALS = {
@@ -29,7 +30,7 @@ const INITIAL_DELAY = 3 * 1000; // 3 seconds after app ready
 function log(...args) {
     try {
         if (process.stdout?.writable) {
-            console.log('[SyncController]', ...args);
+            logger.info('[SyncController]', ...args);
         }
     } catch {
         // Silently ignore EPIPE
