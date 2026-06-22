@@ -675,10 +675,41 @@ app.on('ready', () => {
         try {
             if (!authClient) authClient = await loadSavedCredentialsIfExist();
             if (!authClient) throw new Error('Not authenticated');
-            return await fetchGmail(authClient, 10);
+
+            const gmail = google.gmail({ version: 'v1', auth: authClient });
+            const res = await gmail.users.messages.list({ userId: 'me', maxResults: 10, labelIds: ['INBOX'] });
+            const messages = res.data.messages || [];
+
+            const detailedConfig = { userId: 'me', format: 'metadata' };
+            const emailList = [];
+
+            await Promise.all(messages.map(async (msg) => {
+                try {
+                    const detail = await gmail.users.messages.get({ ...detailedConfig, id: msg.id });
+                    const headers = detail.data.payload.headers;
+                    const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
+                    const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+                    const date = headers.find(h => h.name === 'Date')?.value || '';
+
+                    // Extract unread from labelIds
+                    const isUnread = detail.data.labelIds?.includes('UNREAD') || false;
+
+                    emailList.push({
+                        id: msg.id,
+                        subject,
+                        from,
+                        date,
+                        snippet: detail.data.snippet,
+                        unread: isUnread
+                    });
+                } catch (e) {
+                    log.error('Error fetching email details', e);
+                }
+            }));
+            return emailList;
         } catch (e) {
             log.error("Gmail fetch error", e);
-            return [];
+            return []; // Return empty array instead of crashing
         }
     });
 
@@ -984,14 +1015,21 @@ app.on('ready', () => {
     ipcMain.handle('switch-to-edit', async (event, { docId, docType }) => {
         if (!contentView) return;
 
+        // Security: Validate docId contains only safe characters (alphanumeric, hyphens, underscores)
+        if (!docId || !/^[a-zA-Z0-9_-]+$/.test(docId)) {
+            log.warn('[Security] Blocked switch-to-edit with invalid docId:', docId);
+            return;
+        }
+
         const editUrls = {
             'document': `https://docs.google.com/document/d/${docId}/edit`,
             'spreadsheet': `https://docs.google.com/spreadsheets/d/${docId}/edit`,
             'presentation': `https://docs.google.com/presentation/d/${docId}/edit`
         };
 
-        if (editUrls[docType]) {
-            contentView.webContents.loadURL(editUrls[docType]);
+        const editUrl = editUrls[docType];
+        if (editUrl && isTrustedURL(editUrl)) {
+            contentView.webContents.loadURL(editUrl);
         }
     });
 
@@ -1108,10 +1146,12 @@ app.on('ready', () => {
         return aiMemory.startNewSession();
     });
 
-    // Open a URL in the system browser (used for external links like API key console)
-    ipcMain.handle('open-external', async (event, url) => {
-        if (typeof url === 'string' && url.startsWith('https://')) {
-            shell.openExternal(url);
+            } else {
+                return "I can help you check your **emails**, **schedule**, **files**, or **tasks**. Try asking 'What meetings do I have?' or 'Show my tasks'.";
+            }
+        } catch (e) {
+            log.error("Agent Error", e);
+            throw new Error("Sorry, I encountered an error talking to Google services: " + e.message);
         }
     });
 
@@ -1135,9 +1175,11 @@ app.on('ready', () => {
             if (mainWindow) {
                 await mainWindow.webContents.session.clearStorageData();
             }
-            // Clear the partition session
-            const sharedSession = require('electron').session.fromPartition('persist:googolvibe');
-            await sharedSession.clearStorageData();
+            // Clear both partition sessions (googolvibe = main UI, googleos = auth/BrowserView)
+            const uiSession = require('electron').session.fromPartition('persist:googolvibe');
+            await uiSession.clearStorageData();
+            const authSession = require('electron').session.fromPartition('persist:googleos');
+            await authSession.clearStorageData();
         } catch (e) {
             log.error("Error clearing session", e);
         }
