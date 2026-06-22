@@ -62,9 +62,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
     closeContent: () => ipcRenderer.invoke('close-content'),
 
     // ========================================
-    // Agent
+    // AI Agent (Streaming)
     // ========================================
-    askAgent: (query) => ipcRenderer.invoke('ask-agent', query),
+    askAgentStream: (message, sessionId) =>
+        ipcRenderer.invoke('ask-agent-stream', { message, sessionId }),
+    onAgentStreamChunk: (callback) =>
+        ipcRenderer.on('agent-stream-chunk', (event, data) => callback(data)),
+    onAgentStreamEnd: (callback) =>
+        ipcRenderer.on('agent-stream-end', (event, data) => callback(data)),
+    onAgentStreamError: (callback) =>
+        ipcRenderer.on('agent-stream-error', (event, data) => callback(data)),
+    removeAgentStreamListeners: () => {
+        ipcRenderer.removeAllListeners('agent-stream-chunk');
+        ipcRenderer.removeAllListeners('agent-stream-end');
+        ipcRenderer.removeAllListeners('agent-stream-error');
+    },
+
+    // ========================================
+    // AI Key Management
+    // ========================================
+    saveAnthropicKey: (key) =>
+        ipcRenderer.invoke('save-anthropic-key', key),
+    getAnthropicKeyStatus: () =>
+        ipcRenderer.invoke('get-anthropic-key-status'),
+    testAnthropicKey: () =>
+        ipcRenderer.invoke('test-anthropic-key'),
+    clearAnthropicKey: () =>
+        ipcRenderer.invoke('clear-anthropic-key'),
+
+    // ========================================
+    // AI Session History
+    // ========================================
+    getAiSessions: () =>
+        ipcRenderer.invoke('get-ai-sessions'),
+    clearAiHistory: () =>
+        ipcRenderer.invoke('clear-ai-history'),
+    startNewAiSession: () =>
+        ipcRenderer.invoke('start-new-ai-session'),
 
     // ========================================
     // Notifications
@@ -99,6 +133,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeAllListeners('tasks-synced');
         ipcRenderer.removeAllListeners('drive-synced');
     },
+
+    // ========================================
+    // Shell
+    // ========================================
+    openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
     // ========================================
     // Event Listeners

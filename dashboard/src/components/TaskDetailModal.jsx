@@ -163,7 +163,7 @@ const TaskDetailModal = ({
                     {/* Header */}
                     <div className="task-modal-header">
                         <div className="task-modal-title-row">
-                            <FileText size={18} color="#ea580c" />
+                            <FileText size={18} color="var(--accent-brand)" />
                             <span className="task-modal-label">TASK DETAILS</span>
                             {hasChanges && <span className="task-modal-unsaved">Unsaved changes</span>}
                         </div>

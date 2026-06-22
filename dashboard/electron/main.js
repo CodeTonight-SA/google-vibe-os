@@ -9,6 +9,9 @@ const telemetry = require('./telemetry');
 const recurrenceManager = require('./recurrence-manager');
 const notificationManager = require('./notification-manager');
 const syncController = require('./sync-controller');
+const secureStorage = require('./secure-storage');
+const aiAgent = require('./ai-agent');
+const aiMemory = require('./ai-memory');
 const log = require('./logger');
 
 log.info('[Googol Vibe] App starting — log transport active');
@@ -48,7 +51,8 @@ const TRUSTED_DOMAINS = [
     'slides.google.com',
     'calendar.google.com',
     'mail.google.com',
-    'myaccount.google.com'
+    'myaccount.google.com',
+    'tasks.google.com'
 ];
 
 /**
@@ -302,6 +306,117 @@ function stopSyncController() {
     notificationManager.cancelAll();
 }
 
+// ========================================
+// Extracted Google API Helpers
+// Shared by IPC handlers and AI agent tools
+// ========================================
+
+async function fetchGmail(client, maxResults = 5) {
+    const gmail = google.gmail({ version: 'v1', auth: client });
+    const res = await gmail.users.messages.list({ userId: 'me', maxResults, labelIds: ['INBOX'] });
+    const messages = res.data.messages || [];
+
+    const emailList = [];
+    await Promise.all(messages.map(async (msg) => {
+        try {
+            const detail = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'metadata' });
+            const headers = detail.data.payload.headers;
+            emailList.push({
+                id: msg.id,
+                subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+                from: headers.find(h => h.name === 'From')?.value || 'Unknown',
+                date: headers.find(h => h.name === 'Date')?.value || '',
+                snippet: detail.data.snippet,
+                unread: detail.data.labelIds?.includes('UNREAD') || false
+            });
+        } catch (e) {
+            log.error('Error fetching email details', e);
+        }
+    }));
+    return emailList;
+}
+
+async function fetchCalendar(client, days = 1) {
+    const calendar = google.calendar({ version: 'v3', auth: client });
+    const now = new Date();
+    const timeMax = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+
+    const res = await calendar.events.list({
+        calendarId: 'primary',
+        timeMin: now.toISOString(),
+        timeMax,
+        maxResults: 10,
+        singleEvents: true,
+        orderBy: 'startTime',
+    });
+
+    return (res.data.items || []).map(event => ({
+        id: event.id,
+        summary: event.summary || 'No Title',
+        start: event.start.dateTime || event.start.date,
+        htmlLink: event.htmlLink
+    }));
+}
+
+async function fetchDrive(client, count = 5, type = 'all') {
+    const drive = google.drive({ version: 'v3', auth: client });
+
+    let query = 'trashed = false';
+    if (type === 'documents') {
+        query += " and mimeType='application/vnd.google-apps.document'";
+    } else if (type === 'spreadsheets') {
+        query += " and mimeType='application/vnd.google-apps.spreadsheet'";
+    } else if (type === 'presentations') {
+        query += " and mimeType='application/vnd.google-apps.presentation'";
+    }
+
+    const res = await drive.files.list({
+        pageSize: count,
+        q: query,
+        orderBy: 'modifiedTime desc',
+        fields: 'files(id, name, mimeType, modifiedTime, iconLink, webViewLink, thumbnailLink)'
+    });
+    return res.data.files || [];
+}
+
+async function fetchTasks(client, count = 10) {
+    const tasks = google.tasks({ version: 'v1', auth: client });
+    const lists = await tasks.tasklists.list({ maxResults: 1 });
+    if (!lists.data.items?.length) return { taskListId: null, tasks: [] };
+
+    const taskListId = lists.data.items[0].id;
+    const res = await tasks.tasks.list({
+        tasklist: taskListId,
+        maxResults: count,
+        showCompleted: false
+    });
+
+    return {
+        taskListId,
+        tasks: (res.data.items || []).map(task => ({
+            id: task.id,
+            title: task.title,
+            due: task.due,
+            notes: task.notes,
+            status: task.status
+        }))
+    };
+}
+
+async function createTaskHelper(client, title, due, notes) {
+    const tasks = google.tasks({ version: 'v1', auth: client });
+    const lists = await tasks.tasklists.list({ maxResults: 1 });
+    if (!lists.data.items?.length) throw new Error('No task list found');
+
+    const taskListId = lists.data.items[0].id;
+    const requestBody = { title };
+    if (due) requestBody.due = new Date(due).toISOString();
+    if (notes) requestBody.notes = notes;
+
+    const res = await tasks.tasks.insert({ tasklist: taskListId, requestBody });
+    return res.data;
+}
+
 const createWindow = () => {
     mainWindow = new BrowserWindow({
         width: 1200,
@@ -409,6 +524,32 @@ app.on('ready', () => {
     // Start background sync controller (Gmail 5m, Calendar 15m, Tasks 15m, Drive 30m)
     startSyncController();
 
+    // Initialise AI agent with extracted Google API helpers
+    const pkgVersion = require('../package.json').version;
+    aiAgent.init(
+        { fetchGmail, fetchCalendar, fetchDrive, fetchTasks, createTask: createTaskHelper },
+        mainWindow
+    );
+    aiAgent.setAppVersion(pkgVersion);
+
+    // If Google auth is already available, pass it to the agent
+    (async () => {
+        try {
+            if (!authClient) authClient = await loadSavedCredentialsIfExist();
+            if (authClient) {
+                aiAgent.setAuthClient(authClient);
+                // Cache user profile for system prompt
+                try {
+                    const service = google.oauth2({ version: 'v2', auth: authClient });
+                    const res = await service.userinfo.get();
+                    aiAgent.setUserProfile(res.data);
+                } catch { /* profile will be null in system prompt - acceptable */ }
+            }
+        } catch (e) {
+            log.error('[AI Agent] Failed to init auth:', e.message);
+        }
+    })();
+
     // ========================================
     // Onboarding IPC Handlers
     // ========================================
@@ -501,6 +642,14 @@ app.on('ready', () => {
             syncController.setMainWindow(mainWindow);
             syncController.start();
 
+            // Update AI agent with new auth client and profile
+            aiAgent.setAuthClient(authClient);
+            try {
+                const svc = google.oauth2({ version: 'v2', auth: authClient });
+                const profileRes = await svc.userinfo.get();
+                aiAgent.setUserProfile(profileRes.data);
+            } catch { /* non-critical */ }
+
             return { success: true };
         } catch (error) {
             log.error('Login failed', error);
@@ -568,23 +717,7 @@ app.on('ready', () => {
         try {
             if (!authClient) authClient = await loadSavedCredentialsIfExist();
             if (!authClient) throw new Error('Not authenticated');
-
-            const calendar = google.calendar({ version: 'v3', auth: authClient });
-            const now = new Date().toISOString();
-            const res = await calendar.events.list({
-                calendarId: 'primary',
-                timeMin: now,
-                maxResults: 10,
-                singleEvents: true,
-                orderBy: 'startTime',
-            });
-
-            return res.data.items.map(event => ({
-                id: event.id,
-                summary: event.summary || 'No Title',
-                start: event.start.dateTime || event.start.date,
-                htmlLink: event.htmlLink
-            }));
+            return await fetchCalendar(authClient, 14);
         } catch (e) {
             log.error("Calendar fetch error", e);
             return [];
@@ -595,27 +728,21 @@ app.on('ready', () => {
         try {
             if (!authClient) authClient = await loadSavedCredentialsIfExist();
             if (!authClient) throw new Error('Not authenticated');
-
-            const drive = google.drive({ version: 'v3', auth: authClient });
-            const res = await drive.files.list({
-                pageSize: 12,
-                q: "trashed = false",
-                orderBy: "modifiedTime desc",
-                fields: "nextPageToken, files(id, name, mimeType, iconLink, webViewLink, thumbnailLink)"
-            });
-            return res.data.files;
+            return await fetchDrive(authClient, 12, 'all');
         } catch (e) {
             log.error("Drive fetch error", e);
             return [];
         }
     });
 
-    // Documents (Docs/Sheets/Slides)
+    // Documents (Docs/Sheets/Slides) - uses type filter via shared helper
     ipcMain.handle('get-documents', async () => {
         try {
             if (!authClient) authClient = await loadSavedCredentialsIfExist();
             if (!authClient) throw new Error('Not authenticated');
-
+            // Fetch all document types (docs, sheets, slides) - the original handler
+            // used a compound mimeType query. The shared helper uses individual types.
+            // For backwards compat, fetch all three and combine:
             const drive = google.drive({ version: 'v3', auth: authClient });
             const res = await drive.files.list({
                 pageSize: 12,
@@ -671,28 +798,7 @@ app.on('ready', () => {
         try {
             if (!authClient) authClient = await loadSavedCredentialsIfExist();
             if (!authClient) throw new Error('Not authenticated');
-
-            const tasks = google.tasks({ version: 'v1', auth: authClient });
-            const lists = await tasks.tasklists.list({ maxResults: 1 });
-            if (!lists.data.items?.length) return { taskListId: null, tasks: [] };
-
-            const taskListId = lists.data.items[0].id;
-            const res = await tasks.tasks.list({
-                tasklist: taskListId,
-                maxResults: 20,
-                showCompleted: false
-            });
-
-            return {
-                taskListId,
-                tasks: (res.data.items || []).map(task => ({
-                    id: task.id,
-                    title: task.title,
-                    due: task.due,
-                    notes: task.notes,
-                    status: task.status
-                }))
-            };
+            return await fetchTasks(authClient, 20);
         } catch (e) {
             log.error("Tasks fetch error", e);
             return { taskListId: null, tasks: [] };
@@ -973,88 +1079,72 @@ app.on('ready', () => {
         }
     });
 
-    // Agent Logic
-    ipcMain.handle('ask-agent', async (event, query) => {
+    // ========================================
+    // AI Agent IPC Handlers
+    // ========================================
+
+    // Streaming AI chat - main entry point
+    ipcMain.handle('ask-agent-stream', async (event, { message, sessionId }) => {
         try {
+            // Ensure Google auth is available for tools
             if (!authClient) authClient = await loadSavedCredentialsIfExist();
-            if (!authClient) return "I can't help you yet. Please login to Google first.";
+            if (authClient) {
+                aiAgent.setAuthClient(authClient);
+            }
 
-            const prompt = query.toLowerCase();
+            await aiAgent.chat(message, sessionId);
+            return { success: true };
+        } catch (e) {
+            log.error('[AI Agent] Chat error:', e.message);
+            // Error event already sent by aiAgent.chat() for stream errors
+            return { success: false, error: e.message };
+        }
+    });
 
-            if (prompt.includes('email') || prompt.includes('inbox') || prompt.includes('unread')) {
-                const gmail = google.gmail({ version: 'v1', auth: authClient });
-                const res = await gmail.users.messages.list({ userId: 'me', maxResults: 3, labelIds: ['INBOX'] });
-                const messages = res.data.messages || [];
+    // API Key Management
+    ipcMain.handle('save-anthropic-key', async (event, key) => {
+        try {
+            secureStorage.saveKey(key);
+            aiAgent.refreshClient();
+            return { success: true };
+        } catch (e) {
+            log.error('[AI Agent] Failed to save key:', e.message);
+            return { success: false, error: e.message };
+        }
+    });
 
-                if (messages.length === 0) return "You have no unread emails.";
+    ipcMain.handle('get-anthropic-key-status', async () => {
+        return { configured: secureStorage.hasKey() };
+    });
 
-                let response = "Here are your latest emails:\n\n";
-                for (const msg of messages) {
-                    const detail = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'metadata' });
-                    const headers = detail.data.payload.headers;
-                    const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-                    const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
-                    response += `• ${subject} (from ${from.split('<')[0]})\n`;
-                }
-                return response;
+    ipcMain.handle('test-anthropic-key', async () => {
+        return await aiAgent.testApiKey();
+    });
 
-            } else if (prompt.includes('calendar') || prompt.includes('schedule') || prompt.includes('meet') || prompt.includes('today')) {
-                const calendar = google.calendar({ version: 'v3', auth: authClient });
-                const now = new Date().toISOString();
-                const res = await calendar.events.list({
-                    calendarId: 'primary',
-                    timeMin: now,
-                    maxResults: 3,
-                    singleEvents: true,
-                    orderBy: 'startTime',
-                });
+    ipcMain.handle('clear-anthropic-key', async () => {
+        try {
+            secureStorage.deleteKey();
+            aiAgent.refreshClient(); // Will set client to null
+            return { success: true };
+        } catch (e) {
+            log.error('[AI Agent] Failed to clear key:', e.message);
+            return { success: false, error: e.message };
+        }
+    });
 
-                const events = res.data.items || [];
-                if (events.length === 0) return "Your schedule is clear for the rest of today.";
+    // Session History Management
+    ipcMain.handle('get-ai-sessions', async () => {
+        return aiMemory.getSessions();
+    });
 
-                let response = "Here is what's coming up:\n\n";
-                for (const event of events) {
-                    const start = event.start.dateTime ? new Date(event.start.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'All Day';
-                    response += `• ${start}: ${event.summary}\n`;
-                }
-                return response;
+    ipcMain.handle('clear-ai-history', async () => {
+        aiMemory.clearAll();
+        return { success: true };
+    });
 
-            } else if (prompt.includes('file') || prompt.includes('drive') || prompt.includes('recent')) {
-                const drive = google.drive({ version: 'v3', auth: authClient });
-                const res = await drive.files.list({
-                    pageSize: 3,
-                    q: "trashed = false",
-                    orderBy: "modifiedTime desc",
-                    fields: "files(name, webViewLink)"
-                });
-
-                let response = "Your most recent files:\n\n";
-                for (const file of res.data.files) {
-                    response += `• ${file.name}\n`;
-                }
-                return response;
-
-            } else if (prompt.includes('task') || prompt.includes('todo') || prompt.includes('to do') || prompt.includes('to-do')) {
-                const tasks = google.tasks({ version: 'v1', auth: authClient });
-                const lists = await tasks.tasklists.list({ maxResults: 1 });
-                if (!lists.data.items?.length) return "You don't have any task lists yet.";
-
-                const taskListId = lists.data.items[0].id;
-                const res = await tasks.tasks.list({
-                    tasklist: taskListId,
-                    maxResults: 5,
-                    showCompleted: false
-                });
-
-                const taskItems = res.data.items || [];
-                if (taskItems.length === 0) return "You have no pending tasks. Nice work!";
-
-                let response = "Here are your tasks:\n\n";
-                for (const task of taskItems) {
-                    const due = task.due ? ` (due ${new Date(task.due).toLocaleDateString()})` : '';
-                    response += `• ${task.title}${due}\n`;
-                }
-                return response;
+    ipcMain.handle('start-new-ai-session', async () => {
+        return aiMemory.startNewSession();
+    });
 
             } else {
                 return "I can help you check your **emails**, **schedule**, **files**, or **tasks**. Try asking 'What meetings do I have?' or 'Show my tasks'.";

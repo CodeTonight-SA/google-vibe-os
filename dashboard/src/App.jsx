@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio, Settings, LogOut, Moon, Sun, ChevronDown } from 'lucide-react';
+import { useTheme } from './ThemeContext';
 import logoImg from './assets/logo.webp';
 import { motion } from 'framer-motion';
 import AgentPanel from './components/AgentPanel';
 import OnboardingWizard from './components/OnboardingWizard';
 import TaskDetailModal from './components/TaskDetailModal';
+import { useToast, ToastContainer } from './components/Toast';
+import SettingsPanel from './components/SettingsPanel';
+import EmptyState from './components/EmptyState';
 
 // Skeleton loader - Swiss Nihilism style
 const Skeleton = ({ width = '100%', height = 16, className = '' }) => (
@@ -38,6 +42,13 @@ const SkeletonFileCard = () => (
     </div>
 );
 
+function getTimeGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+}
+
 function App() {
     const [emails, setEmails] = useState([]);
     const [events, setEvents] = useState([]);
@@ -69,6 +80,24 @@ function App() {
     const [onboardingChecked, setOnboardingChecked] = useState(false);
     const [syncStatus, setSyncStatus] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const { toasts, addToast, removeToast } = useToast();
+    const [showSettings, setShowSettings] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const profileMenuRef = useRef(null);
+    const { theme, toggleTheme } = useTheme();
+
+    // Close profile dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+                setShowProfileMenu(false);
+            }
+        };
+        if (showProfileMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showProfileMenu]);
 
     const fetchData = async () => {
         try {
@@ -87,6 +116,7 @@ function App() {
                 })
                 .catch(e => {
                     console.error("Gmail fetch failed", e);
+                    addToast('Failed to load emails', 'error');
                     setEmails([]);
                     setLoadingStates(prev => ({ ...prev, emails: false }));
                 });
@@ -98,6 +128,7 @@ function App() {
                 })
                 .catch(e => {
                     console.error("Calendar fetch failed", e);
+                    addToast('Failed to load calendar events', 'error');
                     setEvents([]);
                     setLoadingStates(prev => ({ ...prev, events: false }));
                 });
@@ -109,6 +140,7 @@ function App() {
                 })
                 .catch(e => {
                     console.error("Drive fetch failed", e);
+                    addToast('Failed to load Drive files', 'error');
                     setFiles([]);
                     setLoadingStates(prev => ({ ...prev, files: false }));
                 });
@@ -120,6 +152,7 @@ function App() {
                 })
                 .catch(e => {
                     console.error("Documents fetch failed", e);
+                    addToast('Failed to load documents', 'error');
                     setDocuments([]);
                     setLoadingStates(prev => ({ ...prev, documents: false }));
                 });
@@ -131,6 +164,7 @@ function App() {
                 })
                 .catch(e => {
                     console.error("Meetings fetch failed", e);
+                    addToast('Failed to load meetings', 'error');
                     setMeetings([]);
                     setLoadingStates(prev => ({ ...prev, meetings: false }));
                 });
@@ -143,6 +177,7 @@ function App() {
                 })
                 .catch(e => {
                     console.error("Tasks fetch failed", e);
+                    addToast('Failed to load tasks', 'error');
                     setTasks([]);
                     setLoadingStates(prev => ({ ...prev, tasks: false }));
                 });
@@ -252,6 +287,51 @@ function App() {
         };
     }, []);
 
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            const isMod = e.ctrlKey || e.metaKey;
+
+            // Escape: close overlays in priority order
+            if (e.key === 'Escape') {
+                if (showProfileMenu) {
+                    setShowProfileMenu(false);
+                } else if (isTaskModalOpen) {
+                    setIsTaskModalOpen(false);
+                    setSelectedTask(null);
+                } else if (showSettings) {
+                    setShowSettings(false);
+                } else if (contentViewOpen) {
+                    if (window.electronAPI && window.electronAPI.closeContent) {
+                        window.electronAPI.closeContent();
+                        setCurrentDoc(null);
+                    }
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + R: refresh data (prevent default browser reload)
+            if (isMod && e.key === 'r') {
+                e.preventDefault();
+                if (isAuthenticated && !loading) {
+                    fetchData();
+                    addToast('Refreshing all data...', 'info', 2000);
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + ,: toggle settings
+            if (isMod && e.key === ',') {
+                e.preventDefault();
+                setShowSettings(prev => !prev);
+                return;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [contentViewOpen, showSettings, showProfileMenu, isTaskModalOpen, isAuthenticated, loading]);
+
     const handleLogin = async () => {
         try {
             const res = await window.electronAPI.login();
@@ -259,9 +339,11 @@ function App() {
                 fetchData();
             } else {
                 console.error("Login failed", res.error);
+                addToast('Login failed. Please try again.', 'error');
             }
         } catch (e) {
             console.error("Login invocation failed", e);
+            addToast('Could not connect to Google. Please try again.', 'error');
         }
     };
 
@@ -282,7 +364,7 @@ function App() {
             <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <img src={logoImg} alt="Googol Vibe" width={48} height={48} className="loading-pulse" style={{ borderRadius: 8 }} />
-                    <h1 className="loading-pulse" style={{ color: '#000000', margin: 0, letterSpacing: '-0.03em' }}>Googol Vibe</h1>
+                    <h1 className="loading-pulse" style={{ color: 'var(--text-heading)', margin: 0, letterSpacing: '-0.03em' }}>Googol Vibe</h1>
                 </div>
             </div>
         );
@@ -292,13 +374,13 @@ function App() {
         return (
             <div className="dashboard-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: 24 }}>
                 <img src={logoImg} alt="Googol Vibe" width={80} height={80} style={{ borderRadius: 12, marginBottom: 8 }} />
-                <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, color: '#000000', letterSpacing: '-0.03em' }}>Googol Vibe</h1>
-                <p style={{ color: '#6b7280', margin: 0 }}>Log in to access your intelligent workspace.</p>
+                <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, color: 'var(--text-heading)', letterSpacing: '-0.03em' }}>Googol Vibe</h1>
+                <p style={{ color: 'var(--text-muted)', margin: 0 }}>Log in to access your intelligent workspace.</p>
                 <button
                     onClick={handleLogin}
                     style={{
-                        background: '#000000',
-                        color: 'white',
+                        background: 'var(--btn-primary-bg)',
+                        color: 'var(--btn-primary-text)',
                         border: 'none',
                         padding: '16px 32px',
                         borderRadius: 0,
@@ -313,8 +395,8 @@ function App() {
                         fontWeight: 500,
                         transition: 'background-color 0.3s'
                     }}
-                    onMouseEnter={(e) => e.target.style.background = '#ea580c'}
-                    onMouseLeave={(e) => e.target.style.background = '#000000'}
+                    onMouseEnter={(e) => e.target.style.background = 'var(--accent-brand)'}
+                    onMouseLeave={(e) => e.target.style.background = 'var(--btn-primary-bg)'}
                 >
                     <LogIn size={18} /> Connect Account
                 </button>
@@ -359,6 +441,7 @@ function App() {
             }
         } catch (e) {
             console.error("Failed to create task", e);
+            addToast('Failed to create task', 'error');
         }
     };
 
@@ -380,6 +463,7 @@ function App() {
             setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedTask } : t));
         } catch (e) {
             console.error("Failed to update task", e);
+            addToast('Failed to save task changes', 'error');
             throw e;
         }
     };
@@ -392,6 +476,7 @@ function App() {
             setTasks(prev => prev.filter(t => t.id !== taskId));
         } catch (e) {
             console.error("Failed to complete task", e);
+            addToast('Failed to complete task', 'error');
             throw e;
         }
     };
@@ -403,6 +488,7 @@ function App() {
             setTasks(prev => prev.filter(t => t.id !== taskId));
         } catch (e) {
             console.error("Failed to delete task", e);
+            addToast('Failed to delete task', 'error');
             throw e;
         }
     };
@@ -423,6 +509,7 @@ function App() {
             return result;
         } catch (e) {
             console.error("Failed to set recurrence", e);
+            addToast('Failed to set task recurrence', 'error');
             throw e;
         }
     };
@@ -474,7 +561,7 @@ function App() {
 
     return (
         <div className="dashboard-container" style={contentViewOpen ? {
-            background: '#ffffff',
+            background: 'var(--bg-color)',
             padding: 0,
             minHeight: '100vh',
             position: 'fixed',
@@ -483,7 +570,7 @@ function App() {
             right: 0,
             bottom: 0
         } : {}}>
-            {/* White header bar when content view is open */}
+            {/* Header bar when content view is open */}
             {contentViewOpen && (
                 <header style={{
                     position: 'fixed',
@@ -491,7 +578,7 @@ function App() {
                     left: 0,
                     right: 0,
                     zIndex: 10000,
-                    background: '#ffffff',
+                    background: 'var(--bg-color)',
                     padding: '12px 24px',
                     height: '80px',
                     boxSizing: 'border-box',
@@ -503,8 +590,8 @@ function App() {
                     {currentDoc && (
                         <div
                             style={{
-                                background: '#ea580c',
-                                color: 'white',
+                                background: 'var(--accent-brand)',
+                                color: 'var(--text-on-accent)',
                                 padding: '10px 20px',
                                 borderRadius: 0,
                                 cursor: 'pointer',
@@ -524,8 +611,8 @@ function App() {
                     )}
                     <div
                         style={{
-                            background: '#000000',
-                            color: 'white',
+                            background: 'var(--btn-primary-bg)',
+                            color: 'var(--btn-primary-text)',
                             padding: '10px 20px',
                             borderRadius: 0,
                             cursor: 'pointer',
@@ -547,22 +634,23 @@ function App() {
             {!contentViewOpen && (
                 <header className="header">
                     <div className="header-content">
-                        <p style={{ margin: 0, fontFamily: 'ui-monospace, "SF Mono", monospace', fontSize: '0.75rem', color: '#ea580c', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>WELCOME BACK</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img src={logoImg} alt="" width={40} height={40} style={{ borderRadius: 8 }} />
-                            <h1>Googol Vibe</h1>
+                        <h1>
+                            {profile
+                                ? <>{getTimeGreeting()}, <b>{profile.name.split(' ')[0]}</b>.</>
+                                : <>{getTimeGreeting()}.</>
+                            }
+                        </h1>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                            <img src={logoImg} alt="" width={20} height={20} style={{ borderRadius: 4 }} />
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>Googol Vibe</span>
                         </div>
-                        {profile && (
-                            <p>
-                                Ready to work, <b>{profile.name}</b>.
-                            </p>
-                        )}
                     </div>
 
                     {isAuthenticated && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             {/* Sync Status Indicator */}
                             <div
+                                className="sync-indicator"
                                 onClick={async () => {
                                     if (isSyncing) return;
                                     setIsSyncing(true);
@@ -571,55 +659,96 @@ function App() {
                                         setSyncStatus(status);
                                     } catch (e) {
                                         console.error('Force sync failed', e);
+                                        addToast('Sync failed', 'error');
                                     }
                                     setIsSyncing(false);
                                 }}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    cursor: 'pointer',
-                                    padding: '6px 10px',
-                                    background: isSyncing ? '#f3f4f6' : 'transparent',
-                                    border: '1px solid #e5e7eb',
-                                    transition: 'all 0.2s'
-                                }}
                                 title={syncStatus?.gmail?.lastSync ? `Last sync: ${new Date(syncStatus.gmail.lastSync).toLocaleTimeString()}` : 'Click to sync'}
                             >
-                                <Radio
-                                    size={14}
-                                    color={isSyncing ? '#ea580c' : '#22c55e'}
-                                    className={isSyncing ? 'sync-pulse' : ''}
-                                />
-                                <span style={{
-                                    fontFamily: 'ui-monospace, "SF Mono", monospace',
-                                    fontSize: '0.625rem',
-                                    color: '#6b7280',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
-                                }}>
+                                <span className={`sync-dot ${isSyncing ? 'syncing' : ''}`} />
+                                <span className="sync-label">
                                     {isSyncing ? 'Syncing...' : 'Live'}
                                 </span>
                             </div>
-                            {profile && <img src={profile.picture} alt="Profile" referrerPolicy="no-referrer" style={{ width: 44, height: 44, borderRadius: 0, border: '1px solid #d1d5db' }} />}
-                            <button
-                                onClick={handleLogout}
-                                style={{
-                                    background: 'transparent',
-                                    border: '1px solid #000000',
-                                    color: '#000000',
-                                    padding: '8px 16px',
-                                    borderRadius: 0,
-                                    cursor: 'pointer',
-                                    fontFamily: 'ui-monospace, "SF Mono", monospace',
-                                    fontSize: '0.625rem',
-                                    fontWeight: 500,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.1em'
-                                }}
-                            >
-                                Logout
-                            </button>
+
+                            {/* Profile Avatar Dropdown */}
+                            <div className="profile-dropdown-wrapper" ref={profileMenuRef}>
+                                <button
+                                    className="profile-avatar-trigger"
+                                    onClick={() => setShowProfileMenu(prev => !prev)}
+                                    aria-label="Open profile menu"
+                                    aria-expanded={showProfileMenu}
+                                >
+                                    {profile?.picture ? (
+                                        <img
+                                            src={profile.picture}
+                                            alt={profile.name || 'Profile'}
+                                            referrerPolicy="no-referrer"
+                                            className="profile-avatar"
+                                        />
+                                    ) : (
+                                        <div className="profile-avatar profile-avatar-fallback">
+                                            <User size={18} />
+                                        </div>
+                                    )}
+                                    <ChevronDown
+                                        size={12}
+                                        className={`profile-chevron ${showProfileMenu ? 'open' : ''}`}
+                                    />
+                                </button>
+
+                                {showProfileMenu && (
+                                    <div className="profile-menu">
+                                        {/* User Identity */}
+                                        <div className="profile-menu-identity">
+                                            <span className="profile-menu-name">{profile?.name || 'User'}</span>
+                                            {profile?.email && (
+                                                <span className="profile-menu-email">{profile.email}</span>
+                                            )}
+                                        </div>
+
+                                        <div className="profile-menu-divider" />
+
+                                        {/* Settings */}
+                                        <button
+                                            className="profile-menu-item"
+                                            onClick={() => {
+                                                setShowProfileMenu(false);
+                                                setShowSettings(true);
+                                            }}
+                                        >
+                                            <Settings size={14} />
+                                            <span>Settings</span>
+                                        </button>
+
+                                        {/* Dark Mode Toggle */}
+                                        <button
+                                            className="profile-menu-item"
+                                            onClick={toggleTheme}
+                                        >
+                                            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                                            <span>Dark Mode</span>
+                                            <span className={`profile-menu-toggle ${theme === 'dark' ? 'active' : ''}`}>
+                                                <span className="profile-menu-toggle-knob" />
+                                            </span>
+                                        </button>
+
+                                        <div className="profile-menu-divider" />
+
+                                        {/* Logout */}
+                                        <button
+                                            className="profile-menu-item profile-menu-item-danger"
+                                            onClick={() => {
+                                                setShowProfileMenu(false);
+                                                handleLogout();
+                                            }}
+                                        >
+                                            <LogOut size={14} />
+                                            <span>Log out</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </header>
@@ -629,7 +758,7 @@ function App() {
                 <div className="grid">
                     {/* Main Content Area (9 Columns) */}
                     <div className="col-span-9">
-                        <div className="grid" style={{ gap: '24px' }}>
+                        <div className="grid" style={{ gap: '32px' }}>
                             {/* Mail Widget */}
                             <div className="col-span-7">
                                 <motion.div
@@ -664,14 +793,18 @@ function App() {
                                                                 {email.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
                                                                 {email.from.split('<')[0].replace(/"/g, '')}
                                                             </span>
-                                                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'ui-monospace, "SF Mono", monospace', fontWeight: 400 }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'ui-monospace, "SF Mono", monospace', fontWeight: 400 }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         </div>
                                                         <div className="item-sub" style={{ fontWeight: email.unread ? 600 : 400 }}>{email.subject}</div>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No new emails</div>
+                                            <EmptyState
+                                                icon={Mail}
+                                                message="Inbox zero"
+                                                hint="No unread emails right now. New messages will appear here automatically."
+                                            />
                                         )}
                                     </div>
                                 </motion.div>
@@ -705,7 +838,7 @@ function App() {
                                     </div>
                                     <div>
                                         {/* Add Task Input */}
-                                        <div id="task-title-input" style={{ display: 'flex', gap: 8, padding: '12px 0', borderBottom: '1px solid #e5e7eb' }}>
+                                        <div id="task-title-input" style={{ display: 'flex', gap: 8, padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
                                             <input
                                                 type="text"
                                                 placeholder="Enter task title..."
@@ -714,18 +847,20 @@ function App() {
                                                 onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
                                                 style={{
                                                     flex: 1,
-                                                    border: '1px solid #d1d5db',
+                                                    border: '1px solid var(--border-medium)',
                                                     padding: '8px 12px',
                                                     fontSize: '0.875rem',
                                                     outline: 'none',
-                                                    fontFamily: 'inherit'
+                                                    fontFamily: 'inherit',
+                                                    background: 'var(--bg-color)',
+                                                    color: 'var(--text-primary)'
                                                 }}
                                             />
                                             <button
                                                 onClick={handleAddTask}
                                                 style={{
-                                                    background: '#ea580c',
-                                                    color: 'white',
+                                                    background: 'var(--accent-brand)',
+                                                    color: 'var(--text-on-accent)',
                                                     border: 'none',
                                                     padding: '8px 12px',
                                                     cursor: 'pointer',
@@ -752,9 +887,9 @@ function App() {
                                                             key={task.id}
                                                             className={`list-item task-item-clickable ${isRecurring ? 'task-recurring' : ''}`}
                                                             onClick={() => handleOpenTaskModal(task)}
-                                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                                                            style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}
                                                         >
-                                                            <div className="list-content" style={{ flex: 1 }}>
+                                                            <div className="list-content" style={{ flex: 1, minWidth: 0 }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
                                                                     {isRecurring && (
                                                                         <span className="task-recurring-icon">
@@ -762,11 +897,6 @@ function App() {
                                                                         </span>
                                                                     )}
                                                                     <span className="task-item-title">{task.title}</span>
-                                                                    {task.notes && (
-                                                                        <span className="task-item-has-notes">
-                                                                            <StickyNote size={12} />
-                                                                        </span>
-                                                                    )}
                                                                 </div>
                                                                 {task.due && (
                                                                     <div className="item-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -775,11 +905,21 @@ function App() {
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                            {task.notes && (
+                                                                <span className="task-item-has-notes" style={{ flexShrink: 0, paddingTop: 2 }}>
+                                                                    <StickyNote size={12} />
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     );
                                                 })
                                             ) : (
-                                                <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No pending tasks</div>
+                                                <EmptyState
+                                                    icon={CheckSquare}
+                                                    iconColor="#16a34a"
+                                                    message="All caught up"
+                                                    hint="No pending tasks. Use the input above to add one."
+                                                />
                                             )}
                                         </div>
                                     </div>
@@ -825,7 +965,11 @@ function App() {
                                                 </div>
                                             ))
                                         ) : (
-                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No meetings scheduled</div>
+                                            <EmptyState
+                                                icon={Video}
+                                                message="No meetings this week"
+                                                hint="Your upcoming meetings with Google Meet links will appear here."
+                                            />
                                         )}
                                     </div>
                                 </motion.div>
@@ -858,6 +1002,7 @@ function App() {
                                                 <div
                                                     key={doc.id}
                                                     className="doc-card"
+                                                    data-tooltip={doc.name}
                                                     onClick={() => handleViewContent(
                                                         getPreviewUrl(doc.id, doc.mimeType),
                                                         'document',
@@ -866,7 +1011,7 @@ function App() {
                                                 >
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                         {getDocIcon(doc.mimeType)}
-                                                        <span style={{ fontSize: '0.7rem', color: '#6b7280', fontFamily: 'ui-monospace', textTransform: 'uppercase' }}>
+                                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'ui-monospace', textTransform: 'uppercase' }}>
                                                             {getDocType(doc.mimeType)}
                                                         </span>
                                                     </div>
@@ -877,7 +1022,11 @@ function App() {
                                                 </div>
                                             ))
                                         ) : (
-                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20, width: '100%' }}>No documents</div>
+                                            <EmptyState
+                                                icon={FileText}
+                                                message="No documents"
+                                                hint="Google Docs, Sheets, and Slides from your Drive will appear here."
+                                            />
                                         )}
                                     </div>
                                 </motion.div>
@@ -911,10 +1060,11 @@ function App() {
                                                 <div
                                                     key={file.id}
                                                     className="file-card"
+                                                    data-tooltip={file.name}
                                                     style={{ cursor: 'pointer' }}
                                                     onClick={() => handleViewContent(file.webViewLink, 'file')}
                                                 >
-                                                    <div style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: 8, overflow: 'hidden', width: '100%', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a1a' }}>{file.name}</div>
+                                                    <div style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: 8, overflow: 'hidden', width: '100%', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{file.name}</div>
                                                     {file.thumbnailLink ? (
                                                         <img src={file.thumbnailLink} className="file-thumb" alt={file.name} referrerPolicy="no-referrer" />
                                                     ) : (
@@ -925,7 +1075,11 @@ function App() {
                                                 </div>
                                             ))
                                         ) : (
-                                            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>No accessible files</div>
+                                            <EmptyState
+                                                icon={HardDrive}
+                                                message="No recent files"
+                                                hint="Files you've recently opened or modified in Google Drive will show here."
+                                            />
                                         )}
                                     </div>
                                 </motion.div>
@@ -940,7 +1094,7 @@ function App() {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.6 }}
                         >
-                            <AgentPanel />
+                            <AgentPanel onOpenSettings={() => setShowSettings(true)} />
                         </motion.div>
                     </div>
                 </div>
@@ -958,6 +1112,18 @@ function App() {
                 isRecurring={selectedTask ? Boolean(getRecurrenceForTask(selectedTask)) : false}
                 recurrenceRule={selectedTask ? getRecurrenceForTask(selectedTask)?.rrule : null}
             />
+
+            {/* Settings Panel */}
+            <SettingsPanel
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+                profile={profile}
+                onLogout={handleLogout}
+                addToast={addToast}
+            />
+
+            {/* Toast Notifications */}
+            <ToastContainer toasts={toasts} onDismiss={removeToast} />
         </div>
     );
 }
