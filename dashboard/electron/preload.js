@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Onboarding
     // ========================================
     getOnboardingState: () => ipcRenderer.invoke('get-onboarding-state'),
-    importCredentials: (filePath) => ipcRenderer.invoke('import-credentials', filePath),
+    importCredentialsContent: (content) => ipcRenderer.invoke('import-credentials-content', content),
     selectCredentialsFile: () => ipcRenderer.invoke('select-credentials-file'),
     updateOnboarding: (updates) => ipcRenderer.invoke('update-onboarding', updates),
     getConfigPaths: () => ipcRenderer.invoke('get-config-paths'),

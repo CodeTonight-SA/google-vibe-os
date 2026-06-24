@@ -14,6 +14,7 @@ const aiAgent = require('./ai-agent');
 const aiMemory = require('./ai-memory');
 const log = require('./logger');
 const { safeHandle } = require('./ipc-safety');
+const tokenStorage = require('./token-storage');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -171,25 +172,22 @@ function authenticateWithLoopback(oAuth2Client) {
 
 async function loadSavedCredentialsIfExist() {
     try {
-        // Try new unified token location first
         const tokenPath = configManager.getTokenPath();
-        let content;
 
-        if (fs.existsSync(tokenPath)) {
-            content = await fs.promises.readFile(tokenPath);
-        } else {
-            // Fall back to legacy location for backwards compatibility
+        // If the token only exists in the legacy location, copy it across first;
+        // tokenStorage.loadToken then handles plaintext -> encrypted migration.
+        if (!fs.existsSync(tokenPath)) {
             const legacyPath = configManager.getLegacyTokenPath();
             if (fs.existsSync(legacyPath)) {
-                content = await fs.promises.readFile(legacyPath);
-                // Migrate to new location
                 await configManager.migrateTokenIfNeeded();
             } else {
                 return null;
             }
         }
 
-        const tokens = JSON.parse(content);
+        const tokens = tokenStorage.loadToken(tokenPath);
+        if (!tokens) return null;
+
         const client = await createOAuthClient();
         client.setCredentials(tokens);
         return client;
@@ -200,10 +198,9 @@ async function loadSavedCredentialsIfExist() {
 }
 
 async function saveCredentials(client) {
-    const tokenPath = configManager.getTokenPath();
-    const payload = JSON.stringify(client.credentials);
-    await fs.promises.writeFile(tokenPath, payload);
-    log.info('Token saved to:', tokenPath);
+    // Encrypt the OAuth tokens at rest (the refresh_token grants long-lived
+    // access to the user's Gmail/Calendar/Drive).
+    tokenStorage.saveToken(configManager.getTokenPath(), client.credentials);
 }
 
 // ========================================
@@ -559,8 +556,12 @@ app.on('ready', () => {
         return configManager.getOnboardingState();
     });
 
-    safeHandle('import-credentials', async (event, filePath) => {
-        await configManager.importCredentials(filePath);
+    // Security: import by CONTENT, not a renderer-supplied path. The drag-and-drop
+    // flow reads the dropped file in the renderer (File API) and sends its bytes,
+    // so the main process never reads an arbitrary path chosen by the renderer.
+    // The native-dialog path goes through 'select-credentials-file' below.
+    safeHandle('import-credentials-content', async (event, content) => {
+        await configManager.importCredentialsContent(content);
         return { success: true };
     });
 
