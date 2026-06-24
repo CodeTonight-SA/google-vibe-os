@@ -15,6 +15,7 @@ const aiMemory = require('./ai-memory');
 const log = require('./logger');
 const { safeHandle } = require('./ipc-safety');
 const tokenStorage = require('./token-storage');
+const { isValidGoogleId } = require('./validators');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -729,6 +730,7 @@ app.on('ready', () => {
     safeHandle('create-task', async (event, { taskListId, title, due }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId)) throw new Error('Invalid task list id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         const res = await tasks.tasks.insert({
@@ -742,6 +744,7 @@ app.on('ready', () => {
     safeHandle('complete-task', async (event, { taskListId, taskId }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         await tasks.tasks.patch({
@@ -756,6 +759,7 @@ app.on('ready', () => {
     safeHandle('update-task', async (event, { taskListId, taskId, updates }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         const res = await tasks.tasks.patch({
@@ -770,6 +774,7 @@ app.on('ready', () => {
     safeHandle('delete-task', async (event, { taskListId, taskId }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         await tasks.tasks.delete({ tasklist: taskListId, task: taskId });
