@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const url = require('url');
+const crypto = require('crypto');
 const { google } = require('googleapis');
 const configManager = require('./config-manager');
 const telemetry = require('./telemetry');
@@ -16,6 +17,7 @@ const log = require('./logger');
 const { safeHandle } = require('./ipc-safety');
 const tokenStorage = require('./token-storage');
 const { isValidGoogleId } = require('./validators');
+const { parseOAuthCallback } = require('./oauth-callback');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -118,28 +120,46 @@ async function createOAuthClient() {
 function authenticateWithLoopback(oAuth2Client) {
     return new Promise((resolve, reject) => {
         const port = configManager.getOAuthPort();
+        // CSRF protection: bind this auth request to a random state we verify on callback.
+        const state = crypto.randomBytes(16).toString('hex');
         const authorizeUrl = oAuth2Client.generateAuthUrl({
             access_type: 'offline',
             scope: SCOPES,
+            state,
         });
 
         const server = http.createServer(async (req, res) => {
-            try {
-                if (req.url.indexOf('/oauth2callback') > -1) {
-                    const qs = new url.URL(req.url, `http://localhost:${port}`).searchParams;
-                    res.end('<h1>Authentication successful!</h1><script>setTimeout(() => window.close(), 1000);</script>');
-                    server.destroy();
-                    const { tokens } = await oAuth2Client.getToken(qs.get('code'));
-                    oAuth2Client.setCredentials(tokens);
-                    resolve(oAuth2Client);
+            // Ignore anything that is not the callback (favicon probes, etc.).
+            if (!req.url || !req.url.startsWith('/oauth2callback')) {
+                res.statusCode = 404;
+                res.end('Not found');
+                return;
+            }
 
-                    if (authWindow) {
-                        authWindow.close();
-                    }
-                    if (mainWindow) {
-                        mainWindow.show();
-                        mainWindow.focus();
-                    }
+            // Validate path, state (CSRF), error param and code before exchanging.
+            const result = parseOAuthCallback(req.url, state, port);
+            if (!result.ok) {
+                res.statusCode = 400;
+                res.end('Authentication failed.');
+                server.destroy();
+                if (authWindow) authWindow.close();
+                reject(new Error(result.error));
+                return;
+            }
+
+            try {
+                res.end('<h1>Authentication successful!</h1><script>setTimeout(() => window.close(), 1000);</script>');
+                server.destroy();
+                const { tokens } = await oAuth2Client.getToken(result.code);
+                oAuth2Client.setCredentials(tokens);
+                resolve(oAuth2Client);
+
+                if (authWindow) {
+                    authWindow.close();
+                }
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
                 }
             } catch (e) {
                 res.end('Error fetching token');
@@ -433,7 +453,11 @@ const createWindow = () => {
         title: 'Googol Vibe'
     });
 
-    // Set Content Security Policy (production only - Vite HMR needs inline scripts in dev)
+    // Set Content Security Policy (production only - Vite HMR needs inline scripts/ws in dev).
+    // Deferred (each needs a running-app check): a dev-mode CSP; tightening style-src off
+    // 'unsafe-inline' (React/framer inject inline styles - needs a nonce); a CSP for the
+    // persist:googleos session is intentionally NOT added - it loads Google's own login/Docs
+    // pages, which manage their own CSP, and forcing ours would break them.
     const isDev = process.env.NODE_ENV === 'development';
     if (!isDev) {
         mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
@@ -447,7 +471,10 @@ const createWindow = () => {
                         "img-src 'self' data: https: blob:;" +
                         "font-src 'self' data:;" +
                         "connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.google.com;" +
-                        "frame-src https://*.google.com https://accounts.google.com;"
+                        "frame-src https://*.google.com https://accounts.google.com;" +
+                        "object-src 'none';" +
+                        "base-uri 'self';" +
+                        "frame-ancestors 'none';"
                     ]
                 }
             });
