@@ -235,6 +235,26 @@ describe('ConfigManager', () => {
     })
   })
 
+  describe('importCredentialsContent (Critical #3 — content, not a path)', () => {
+    it('imports valid credentials content', async () => {
+      const destPath = await configManager.importCredentialsContent(
+        JSON.stringify({ installed: { client_id: 'content-id', client_secret: 's' } })
+      )
+      expect(fs.existsSync(destPath)).toBe(true)
+      expect(JSON.parse(fs.readFileSync(destPath, 'utf8')).installed.client_id).toBe('content-id')
+    })
+
+    it('rejects content that is not valid JSON', async () => {
+      await expect(configManager.importCredentialsContent('not json'))
+        .rejects.toThrow('Invalid credentials file')
+    })
+
+    it('rejects content missing client_id', async () => {
+      await expect(configManager.importCredentialsContent(JSON.stringify({ foo: 'bar' })))
+        .rejects.toThrow('Invalid credentials file')
+    })
+  })
+
   describe('migrateTokenIfNeeded', () => {
     it('returns false when new token already exists', async () => {
       configManager.getLegacyTokenPath = () => path.join(tmpDir, 'nope.json')

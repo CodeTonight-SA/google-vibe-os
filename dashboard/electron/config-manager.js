@@ -259,12 +259,29 @@ class ConfigManager {
     }
 
     /**
-     * Import credentials from a file path
+     * Import credentials from a file path (used by the native file dialog, where
+     * the path is chosen by the main process — never supplied by the renderer).
      * @param {string} sourcePath - Path to credentials file to import
      */
     async importCredentials(sourcePath) {
         const content = await fs.promises.readFile(sourcePath, 'utf8');
-        const creds = JSON.parse(content);
+        return this.importCredentialsContent(content);
+    }
+
+    /**
+     * Import credentials from raw JSON content (used by drag-and-drop, where the
+     * renderer reads the dropped file itself and sends its bytes). The main
+     * process never reads a renderer-supplied filesystem path this way, closing
+     * the arbitrary-file-read hole.
+     * @param {string} content - Raw credentials.json content
+     */
+    async importCredentialsContent(content) {
+        let creds;
+        try {
+            creds = JSON.parse(content);
+        } catch {
+            throw new Error('Invalid credentials file: not valid JSON');
+        }
 
         // Validate structure
         if (!creds.installed?.client_id && !creds.web?.client_id) {
