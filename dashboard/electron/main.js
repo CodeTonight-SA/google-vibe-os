@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const url = require('url');
+const crypto = require('crypto');
 const { google } = require('googleapis');
 const configManager = require('./config-manager');
 const telemetry = require('./telemetry');
@@ -14,6 +15,10 @@ const aiAgent = require('./ai-agent');
 const aiMemory = require('./ai-memory');
 const log = require('./logger');
 const { safeHandle } = require('./ipc-safety');
+const tokenStorage = require('./token-storage');
+const { isValidGoogleId } = require('./validators');
+const { parseOAuthCallback } = require('./oauth-callback');
+const urlTrust = require('./url-trust');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -42,36 +47,10 @@ let authWindow;
 let authClient;
 let contentView = null; // Track the active BrowserView
 
-// Security: Trusted domains for navigation and content loading
-const TRUSTED_DOMAINS = [
-    'accounts.google.com',
-    'docs.google.com',
-    'drive.google.com',
-    'meet.google.com',
-    'sheets.google.com',
-    'slides.google.com',
-    'calendar.google.com',
-    'mail.google.com',
-    'myaccount.google.com',
-    'tasks.google.com'
-];
-
-/**
- * Check if a URL is a trusted destination.
- * Allows Google domains, localhost (dev server), and file:// (production).
- */
+// URL trust (navigation / content loading) lives in ./url-trust (pure + tested).
+// localhost is trusted ONLY on the dev-server port, not any localhost port (#11).
 function isTrustedURL(urlString) {
-    try {
-        const parsed = new URL(urlString);
-        if (parsed.protocol === 'file:') return true;
-        if (parsed.hostname === 'localhost') return true;
-        if (parsed.protocol !== 'https:') return false;
-        return TRUSTED_DOMAINS.some(domain =>
-            parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
-        );
-    } catch {
-        return false;
-    }
+    return urlTrust.isTrustedURL(urlString, { vitePort: configManager.getVitePort() });
 }
 
 // ConfigManager provides all paths - see config-manager.js for details
@@ -116,28 +95,46 @@ async function createOAuthClient() {
 function authenticateWithLoopback(oAuth2Client) {
     return new Promise((resolve, reject) => {
         const port = configManager.getOAuthPort();
+        // CSRF protection: bind this auth request to a random state we verify on callback.
+        const state = crypto.randomBytes(16).toString('hex');
         const authorizeUrl = oAuth2Client.generateAuthUrl({
             access_type: 'offline',
             scope: SCOPES,
+            state,
         });
 
         const server = http.createServer(async (req, res) => {
-            try {
-                if (req.url.indexOf('/oauth2callback') > -1) {
-                    const qs = new url.URL(req.url, `http://localhost:${port}`).searchParams;
-                    res.end('<h1>Authentication successful!</h1><script>setTimeout(() => window.close(), 1000);</script>');
-                    server.destroy();
-                    const { tokens } = await oAuth2Client.getToken(qs.get('code'));
-                    oAuth2Client.setCredentials(tokens);
-                    resolve(oAuth2Client);
+            // Ignore anything that is not the callback (favicon probes, etc.).
+            if (!req.url || !req.url.startsWith('/oauth2callback')) {
+                res.statusCode = 404;
+                res.end('Not found');
+                return;
+            }
 
-                    if (authWindow) {
-                        authWindow.close();
-                    }
-                    if (mainWindow) {
-                        mainWindow.show();
-                        mainWindow.focus();
-                    }
+            // Validate path, state (CSRF), error param and code before exchanging.
+            const result = parseOAuthCallback(req.url, state, port);
+            if (!result.ok) {
+                res.statusCode = 400;
+                res.end('Authentication failed.');
+                server.destroy();
+                if (authWindow) authWindow.close();
+                reject(new Error(result.error));
+                return;
+            }
+
+            try {
+                res.end('<h1>Authentication successful!</h1><script>setTimeout(() => window.close(), 1000);</script>');
+                server.destroy();
+                const { tokens } = await oAuth2Client.getToken(result.code);
+                oAuth2Client.setCredentials(tokens);
+                resolve(oAuth2Client);
+
+                if (authWindow) {
+                    authWindow.close();
+                }
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
                 }
             } catch (e) {
                 res.end('Error fetching token');
@@ -152,6 +149,8 @@ function authenticateWithLoopback(oAuth2Client) {
                 webPreferences: {
                     nodeIntegration: false,
                     contextIsolation: true,
+                    sandbox: true,
+                    webSecurity: true,
                     partition: 'persist:googleos'
                 },
                 autoHideMenuBar: true,
@@ -171,25 +170,22 @@ function authenticateWithLoopback(oAuth2Client) {
 
 async function loadSavedCredentialsIfExist() {
     try {
-        // Try new unified token location first
         const tokenPath = configManager.getTokenPath();
-        let content;
 
-        if (fs.existsSync(tokenPath)) {
-            content = await fs.promises.readFile(tokenPath);
-        } else {
-            // Fall back to legacy location for backwards compatibility
+        // If the token only exists in the legacy location, copy it across first;
+        // tokenStorage.loadToken then handles plaintext -> encrypted migration.
+        if (!fs.existsSync(tokenPath)) {
             const legacyPath = configManager.getLegacyTokenPath();
             if (fs.existsSync(legacyPath)) {
-                content = await fs.promises.readFile(legacyPath);
-                // Migrate to new location
                 await configManager.migrateTokenIfNeeded();
             } else {
                 return null;
             }
         }
 
-        const tokens = JSON.parse(content);
+        const tokens = tokenStorage.loadToken(tokenPath);
+        if (!tokens) return null;
+
         const client = await createOAuthClient();
         client.setCredentials(tokens);
         return client;
@@ -200,10 +196,9 @@ async function loadSavedCredentialsIfExist() {
 }
 
 async function saveCredentials(client) {
-    const tokenPath = configManager.getTokenPath();
-    const payload = JSON.stringify(client.credentials);
-    await fs.promises.writeFile(tokenPath, payload);
-    log.info('Token saved to:', tokenPath);
+    // Encrypt the OAuth tokens at rest (the refresh_token grants long-lived
+    // access to the user's Gmail/Calendar/Drive).
+    tokenStorage.saveToken(configManager.getTokenPath(), client.credentials);
 }
 
 // ========================================
@@ -426,6 +421,8 @@ const createWindow = () => {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
+            webSecurity: true,
             partition: 'persist:googolvibe'
         },
         titleBarStyle: 'hiddenInset',
@@ -435,7 +432,11 @@ const createWindow = () => {
         title: 'Googol Vibe'
     });
 
-    // Set Content Security Policy (production only - Vite HMR needs inline scripts in dev)
+    // Set Content Security Policy (production only - Vite HMR needs inline scripts/ws in dev).
+    // Deferred (each needs a running-app check): a dev-mode CSP; tightening style-src off
+    // 'unsafe-inline' (React/framer inject inline styles - needs a nonce); a CSP for the
+    // persist:googleos session is intentionally NOT added - it loads Google's own login/Docs
+    // pages, which manage their own CSP, and forcing ours would break them.
     const isDev = process.env.NODE_ENV === 'development';
     if (!isDev) {
         mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
@@ -449,7 +450,10 @@ const createWindow = () => {
                         "img-src 'self' data: https: blob:;" +
                         "font-src 'self' data:;" +
                         "connect-src 'self' https://accounts.google.com https://*.googleapis.com https://*.google.com;" +
-                        "frame-src https://*.google.com https://accounts.google.com;"
+                        "frame-src https://*.google.com https://accounts.google.com;" +
+                        "object-src 'none';" +
+                        "base-uri 'self';" +
+                        "frame-ancestors 'none';"
                     ]
                 }
             });
@@ -461,7 +465,8 @@ const createWindow = () => {
 
     mainWindow.loadURL(startUrl);
 
-    if (isDev) {
+    // DevTools only when explicitly opted in (GV_DEVTOOLS=1), not on every dev run.
+    if (process.env.GV_DEVTOOLS === '1') {
         mainWindow.webContents.openDevTools();
     }
 
@@ -559,8 +564,12 @@ app.on('ready', () => {
         return configManager.getOnboardingState();
     });
 
-    safeHandle('import-credentials', async (event, filePath) => {
-        await configManager.importCredentials(filePath);
+    // Security: import by CONTENT, not a renderer-supplied path. The drag-and-drop
+    // flow reads the dropped file in the renderer (File API) and sends its bytes,
+    // so the main process never reads an arbitrary path chosen by the renderer.
+    // The native-dialog path goes through 'select-credentials-file' below.
+    safeHandle('import-credentials-content', async (event, content) => {
+        await configManager.importCredentialsContent(content);
         return { success: true };
     });
 
@@ -728,6 +737,7 @@ app.on('ready', () => {
     safeHandle('create-task', async (event, { taskListId, title, due }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId)) throw new Error('Invalid task list id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         const res = await tasks.tasks.insert({
@@ -741,6 +751,7 @@ app.on('ready', () => {
     safeHandle('complete-task', async (event, { taskListId, taskId }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         await tasks.tasks.patch({
@@ -755,6 +766,7 @@ app.on('ready', () => {
     safeHandle('update-task', async (event, { taskListId, taskId, updates }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         const res = await tasks.tasks.patch({
@@ -769,6 +781,7 @@ app.on('ready', () => {
     safeHandle('delete-task', async (event, { taskListId, taskId }) => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
+        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
 
         const tasks = google.tasks({ version: 'v1', auth: authClient });
         await tasks.tasks.delete({ tasklist: taskListId, task: taskId });
@@ -951,6 +964,8 @@ app.on('ready', () => {
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
+                sandbox: true,
+                webSecurity: true,
                 partition: 'persist:googleos'
             }
         });

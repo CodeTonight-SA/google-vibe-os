@@ -26,7 +26,16 @@ export default function CredentialsStep({ onNext, onBack, data }) {
         const file = e.dataTransfer.files[0];
         if (!file) return;
 
-        await processFile(file.path);
+        // Security: read the dropped file's bytes in the renderer (File API) and
+        // send the content — never a filesystem path — to the main process.
+        let content;
+        try {
+            content = await file.text();
+        } catch {
+            setError('Could not read the dropped file.');
+            return;
+        }
+        await processFileContent(content);
     }, []);
 
     const handleBrowse = async () => {
@@ -56,12 +65,12 @@ export default function CredentialsStep({ onNext, onBack, data }) {
         }
     };
 
-    const processFile = async (filePath) => {
+    const processFileContent = async (content) => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const result = await window.electronAPI.importCredentials(filePath);
+            const result = await window.electronAPI.importCredentialsContent(content);
 
             if (result.success) {
                 setSuccess(true);
