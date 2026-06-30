@@ -10,6 +10,9 @@ const { RRule } = require('rrule');
 const configManager = require('./config-manager');
 const log = require('./logger');
 
+// DoS / correctness bound for stored RRULE strings.
+const MAX_RRULE_LEN = 2048;
+
 class RecurrenceManager {
     constructor() {
         this.rules = [];
@@ -64,6 +67,9 @@ class RecurrenceManager {
      * @returns {Object} Created rule
      */
     createRule({ title, notes, rruleString, taskListId }) {
+        if (!this.isValidRRule(rruleString)) {
+            throw new Error('Invalid recurrence rule');
+        }
         const rule = {
             id: this.generateId(),
             title,
@@ -88,6 +94,10 @@ class RecurrenceManager {
     updateRule(id, updates) {
         const index = this.rules.findIndex(r => r.id === id);
         if (index === -1) return null;
+
+        if (updates.rrule !== undefined && !this.isValidRRule(updates.rrule)) {
+            throw new Error('Invalid recurrence rule');
+        }
 
         // If rrule changed, recalculate next due
         if (updates.rrule && updates.rrule !== this.rules[index].rrule) {
@@ -163,6 +173,23 @@ class RecurrenceManager {
         } catch (e) {
             log.error('[RecurrenceManager] Invalid RRULE:', rruleString, e);
             return null;
+        }
+    }
+
+    /**
+     * Validate an RRULE string before storing/parsing it (DoS + correctness guard).
+     * @param {string} rruleString
+     * @returns {boolean}
+     */
+    isValidRRule(rruleString) {
+        if (typeof rruleString !== 'string' || rruleString.length === 0 || rruleString.length > MAX_RRULE_LEN) {
+            return false;
+        }
+        try {
+            RRule.fromString(rruleString);
+            return true;
+        } catch {
+            return false;
         }
     }
 
