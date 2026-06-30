@@ -18,6 +18,7 @@ const { safeHandle } = require('./ipc-safety');
 const tokenStorage = require('./token-storage');
 const { isValidGoogleId } = require('./validators');
 const { parseOAuthCallback } = require('./oauth-callback');
+const urlTrust = require('./url-trust');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -46,36 +47,10 @@ let authWindow;
 let authClient;
 let contentView = null; // Track the active BrowserView
 
-// Security: Trusted domains for navigation and content loading
-const TRUSTED_DOMAINS = [
-    'accounts.google.com',
-    'docs.google.com',
-    'drive.google.com',
-    'meet.google.com',
-    'sheets.google.com',
-    'slides.google.com',
-    'calendar.google.com',
-    'mail.google.com',
-    'myaccount.google.com',
-    'tasks.google.com'
-];
-
-/**
- * Check if a URL is a trusted destination.
- * Allows Google domains, localhost (dev server), and file:// (production).
- */
+// URL trust (navigation / content loading) lives in ./url-trust (pure + tested).
+// localhost is trusted ONLY on the dev-server port, not any localhost port (#11).
 function isTrustedURL(urlString) {
-    try {
-        const parsed = new URL(urlString);
-        if (parsed.protocol === 'file:') return true;
-        if (parsed.hostname === 'localhost') return true;
-        if (parsed.protocol !== 'https:') return false;
-        return TRUSTED_DOMAINS.some(domain =>
-            parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
-        );
-    } catch {
-        return false;
-    }
+    return urlTrust.isTrustedURL(urlString, { vitePort: configManager.getVitePort() });
 }
 
 // ConfigManager provides all paths - see config-manager.js for details
@@ -174,6 +149,8 @@ function authenticateWithLoopback(oAuth2Client) {
                 webPreferences: {
                     nodeIntegration: false,
                     contextIsolation: true,
+                    sandbox: true,
+                    webSecurity: true,
                     partition: 'persist:googleos'
                 },
                 autoHideMenuBar: true,
@@ -444,6 +421,8 @@ const createWindow = () => {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
+            webSecurity: true,
             partition: 'persist:googolvibe'
         },
         titleBarStyle: 'hiddenInset',
@@ -486,7 +465,8 @@ const createWindow = () => {
 
     mainWindow.loadURL(startUrl);
 
-    if (isDev) {
+    // DevTools only when explicitly opted in (GV_DEVTOOLS=1), not on every dev run.
+    if (process.env.GV_DEVTOOLS === '1') {
         mainWindow.webContents.openDevTools();
     }
 
@@ -984,6 +964,8 @@ app.on('ready', () => {
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
+                sandbox: true,
+                webSecurity: true,
                 partition: 'persist:googleos'
             }
         });
