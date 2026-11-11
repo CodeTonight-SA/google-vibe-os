@@ -1,0 +1,75 @@
+{
+  "electron/__tests__/notification-manager.test.mjs": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "electron/__tests__/recurrence-manager.test.mjs": {
+    "no-unused-vars": {
+      "count": 4
+    }
+  },
+  "electron/config-manager.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "electron/log-redact.js": {
+    "no-useless-escape": {
+      "count": 5
+    }
+  },
+  "electron/main.js": {
+    "no-unused-vars": {
+      "count": 6
+    }
+  },
+  "electron/notification-manager.js": {
+    "no-unused-vars": {
+      "count": 3
+    }
+  },
+  "electron/recurrence-manager.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "electron/telemetry.js": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "src/App.jsx": {
+    "no-unused-vars": {
+      "count": 5
+    }
+  },
+  "src/components/AgentPanel.jsx": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "src/components/OnboardingWizard.jsx": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "src/components/SettingsPanel.jsx": {
+    "no-unused-vars": {
+      "count": 3
+    }
+  },
+  "src/components/WaitlistModal.jsx": {
+    "no-unused-vars": {
+      "count": 2
+    },
+    "react/no-unescaped-entities": {
+      "count": 4
+    }
+  },
+  "src/components/onboarding/GCPSetupStep.jsx": {
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  }
+}
