@@ -1,9 +1,6 @@
-const { app, BrowserWindow, ipcMain, shell, BrowserView, dialog, Notification } = require('electron');
+const { app, BrowserWindow, shell, BrowserView, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const http = require('http');
-const url = require('url');
-const crypto = require('crypto');
 const { google } = require('googleapis');
 const configManager = require('./config-manager');
 const telemetry = require('./telemetry');
@@ -17,7 +14,7 @@ const log = require('./logger');
 const { safeHandle } = require('./ipc-safety');
 const tokenStorage = require('./token-storage');
 const { isValidGoogleId } = require('./validators');
-const { parseOAuthCallback } = require('./oauth-callback');
+const googleAuth = require('./google-auth');
 const urlTrust = require('./url-trust');
 
 log.info('[Googol Vibe] App starting — log transport active');
@@ -43,7 +40,6 @@ try {
 }
 
 let mainWindow;
-let authWindow;
 let authClient;
 let contentView = null; // Track the active BrowserView
 
@@ -67,12 +63,14 @@ const SCOPES = [
     'https://www.googleapis.com/auth/tasks',
 ];
 
-async function loadCredentials() {
+// The credentials file holds one OAuth client: a Desktop client under
+// "installed", or a Web client under "web".
+async function readClientFile() {
     try {
         const credentialsPath = configManager.getCredentialsPath();
-        const content = await fs.promises.readFile(credentialsPath);
-        const keys = JSON.parse(content);
-        return keys.installed || keys.web;
+        const json = JSON.parse(await fs.promises.readFile(credentialsPath));
+        const type = json.installed ? 'installed' : 'web';
+        return json[type] ? { type, keys: json[type] } : null;
     } catch (e) {
         log.error("Error loading credentials from:", configManager.getCredentialsPath(), e);
         return null; // Handle missing credentials gracefully
@@ -80,92 +78,29 @@ async function loadCredentials() {
 }
 
 async function createOAuthClient() {
-    const keys = await loadCredentials();
-    if (!keys) throw new Error("Credentials not found. Please add credentials.json to " + configManager.getCredentialsPath());
-
-    const port = configManager.getOAuthPort();
-    return new google.auth.OAuth2(
-        keys.client_id,
-        keys.client_secret,
-        `http://localhost:${port}/oauth2callback` // Must match GCP Console redirect URI
-    );
+    const file = await readClientFile();
+    if (!file) throw new Error("Credentials not found. Please add credentials.json to " + configManager.getCredentialsPath());
+    const client = new google.auth.OAuth2(file.keys.client_id, file.keys.client_secret);
+    return { client, clientType: file.type };
 }
 
-// Custom Loopback Flow
-function authenticateWithLoopback(oAuth2Client) {
-    return new Promise((resolve, reject) => {
-        const port = configManager.getOAuthPort();
-        // CSRF protection: bind this auth request to a random state we verify on callback.
-        const state = crypto.randomBytes(16).toString('hex');
-        const authorizeUrl = oAuth2Client.generateAuthUrl({
-            access_type: 'offline',
-            scope: SCOPES,
-            state,
-        });
-
-        const server = http.createServer(async (req, res) => {
-            // Ignore anything that is not the callback (favicon probes, etc.).
-            if (!req.url || !req.url.startsWith('/oauth2callback')) {
-                res.statusCode = 404;
-                res.end('Not found');
-                return;
-            }
-
-            // Validate path, state (CSRF), error param and code before exchanging.
-            const result = parseOAuthCallback(req.url, state, port);
-            if (!result.ok) {
-                res.statusCode = 400;
-                res.end('Authentication failed.');
-                server.destroy();
-                if (authWindow) authWindow.close();
-                reject(new Error(result.error));
-                return;
-            }
-
-            try {
-                res.end('<h1>Authentication successful!</h1><script>setTimeout(() => window.close(), 1000);</script>');
-                server.destroy();
-                const { tokens } = await oAuth2Client.getToken(result.code);
-                oAuth2Client.setCredentials(tokens);
-                resolve(oAuth2Client);
-
-                if (authWindow) {
-                    authWindow.close();
-                }
-                if (mainWindow) {
-                    mainWindow.show();
-                    mainWindow.focus();
-                }
-            } catch (e) {
-                res.end('Error fetching token');
-                reject(e);
-            }
-        }).listen(port, () => {
-            authWindow = new BrowserWindow({
-                width: 600,
-                height: 700,
-                parent: mainWindow,
-                modal: true,
-                webPreferences: {
-                    nodeIntegration: false,
-                    contextIsolation: true,
-                    sandbox: true,
-                    webSecurity: true,
-                    partition: 'persist:googleos'
-                },
-                autoHideMenuBar: true,
-            });
-            authWindow.loadURL(authorizeUrl);
-
-            authWindow.on('closed', () => {
-                authWindow = null;
-            });
-        });
-
-        server.on('error', (e) => reject(e));
-        const destroy = require('server-destroy');
-        destroy(server);
+// Sign in through the user's own browser (see google-auth.js), then bring the
+// app back to the front.
+async function signInWithGoogle() {
+    const { client, clientType } = await createOAuthClient();
+    const signedIn = await googleAuth.signIn({
+        client,
+        clientType,
+        scopes: SCOPES,
+        openExternal: (consentUrl) => shell.openExternal(consentUrl),
+        overridePort: configManager.getOAuthPort(),
     });
+    if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+    }
+    app.focus({ steal: true });
+    return signedIn;
 }
 
 async function loadSavedCredentialsIfExist() {
@@ -186,7 +121,7 @@ async function loadSavedCredentialsIfExist() {
         const tokens = tokenStorage.loadToken(tokenPath);
         if (!tokens) return null;
 
-        const client = await createOAuthClient();
+        const { client } = await createOAuthClient();
         client.setCredentials(tokens);
         return client;
     } catch (err) {
@@ -199,6 +134,15 @@ async function saveCredentials(client) {
     // Encrypt the OAuth tokens at rest (the refresh_token grants long-lived
     // access to the user's Gmail/Calendar/Drive).
     tokenStorage.saveToken(configManager.getTokenPath(), client.credentials);
+}
+
+// The Tasks API for a handler that changes one task, after the shared checks:
+// signed in, and both IDs well formed.
+async function getTasksApi(taskListId, taskId) {
+    if (!authClient) authClient = await loadSavedCredentialsIfExist();
+    if (!authClient) throw new Error('Not authenticated');
+    if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
+    return google.tasks({ version: 'v1', auth: authClient });
 }
 
 // ========================================
@@ -226,38 +170,42 @@ async function checkAndGenerateRecurringTasks() {
 
         for (const rule of dueRules) {
             try {
-                // Create the task in Google Tasks
-                const newTask = await tasks.tasks.insert({
-                    tasklist: rule.taskListId,
-                    requestBody: {
-                        title: rule.title,
-                        notes: rule.notes,
-                        due: rule.nextDue
-                    }
-                });
-
-                log.info(`[Recurrence] Generated task: ${rule.title}`);
-
-                // Mark as generated and calculate next occurrence
-                recurrenceManager.markGenerated(rule.id);
-
-                // Show native notification for recurring task
-                notificationManager.showRecurringTaskGenerated(rule, newTask.data.id);
-
-                // Notify renderer if window exists
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('recurring-task-generated', {
-                        ruleId: rule.id,
-                        taskId: newTask.data.id,
-                        title: rule.title
-                    });
-                }
+                await generateRecurringTask(tasks, rule);
             } catch (e) {
                 log.error(`[Recurrence] Failed to generate task "${rule.title}":`, e.message);
             }
         }
     } catch (e) {
         log.error('[Recurrence] Scheduler error:', e);
+    }
+}
+
+async function generateRecurringTask(tasks, rule) {
+    // Create the task in Google Tasks
+    const newTask = await tasks.tasks.insert({
+        tasklist: rule.taskListId,
+        requestBody: {
+            title: rule.title,
+            notes: rule.notes,
+            due: rule.nextDue
+        }
+    });
+
+    log.info(`[Recurrence] Generated task: ${rule.title}`);
+
+    // Mark as generated and calculate next occurrence
+    recurrenceManager.markGenerated(rule.id);
+
+    // Show native notification for recurring task
+    notificationManager.showRecurringTaskGenerated(rule, newTask.data.id);
+
+    // Notify renderer if window exists
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('recurring-task-generated', {
+            ruleId: rule.id,
+            taskId: newTask.data.id,
+            title: rule.title
+        });
     }
 }
 
@@ -621,8 +569,7 @@ app.on('ready', () => {
     // ========================================
 
     safeHandle('google-login', async () => {
-        const client = await createOAuthClient();
-        authClient = await authenticateWithLoopback(client);
+        authClient = await signInWithGoogle();
         await saveCredentials(authClient);
 
         // Update onboarding state with connected email
@@ -633,7 +580,7 @@ app.on('ready', () => {
                 onboardingComplete: true,
                 connectedEmail: res.data.email
             });
-        } catch (e) {
+        } catch {
             // Still mark as complete even if we can't get email
             configManager.updateOnboarding({ onboardingComplete: true });
         }
@@ -749,11 +696,7 @@ app.on('ready', () => {
 
     // Tasks - COMPLETE
     safeHandle('complete-task', async (event, { taskListId, taskId }) => {
-        if (!authClient) authClient = await loadSavedCredentialsIfExist();
-        if (!authClient) throw new Error('Not authenticated');
-        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
-
-        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        const tasks = await getTasksApi(taskListId, taskId);
         await tasks.tasks.patch({
             tasklist: taskListId,
             task: taskId,
@@ -764,11 +707,7 @@ app.on('ready', () => {
 
     // Tasks - UPDATE (for notes, title, due date)
     safeHandle('update-task', async (event, { taskListId, taskId, updates }) => {
-        if (!authClient) authClient = await loadSavedCredentialsIfExist();
-        if (!authClient) throw new Error('Not authenticated');
-        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
-
-        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        const tasks = await getTasksApi(taskListId, taskId);
         const res = await tasks.tasks.patch({
             tasklist: taskListId,
             task: taskId,
@@ -779,11 +718,7 @@ app.on('ready', () => {
 
     // Tasks - DELETE
     safeHandle('delete-task', async (event, { taskListId, taskId }) => {
-        if (!authClient) authClient = await loadSavedCredentialsIfExist();
-        if (!authClient) throw new Error('Not authenticated');
-        if (!isValidGoogleId(taskListId) || !isValidGoogleId(taskId)) throw new Error('Invalid task id');
-
-        const tasks = google.tasks({ version: 'v1', auth: authClient });
+        const tasks = await getTasksApi(taskListId, taskId);
         await tasks.tasks.delete({ tasklist: taskListId, task: taskId });
         return { success: true };
     });
@@ -897,7 +832,7 @@ app.on('ready', () => {
         return rules.find(r => r.lastGeneratedTaskId === taskId) || null;
     });
 
-    safeHandle('set-task-recurrence', async (event, { taskListId, taskId, title, notes, rruleString }) => {
+    safeHandle('set-task-recurrence', async (event, { taskListId, title, notes, rruleString }) => {
         if (!rruleString) {
             // Remove recurrence - find and delete any matching rule
             const rules = recurrenceManager.getAllRules();
@@ -945,9 +880,10 @@ app.on('ready', () => {
         }
     });
 
-    safeHandle('view-content', async (event, { url, type }) => {
+    safeHandle('view-content', async (event, { url }) => {
         // Security: Only allow trusted Google domains in the BrowserView
-        // The BrowserView shares the persist:googleos session (Google auth cookies)
+        // The BrowserView keeps its own Google session (persist:googleos). Sign-in
+        // now runs in the user's browser, so this view no longer inherits it.
         if (!isTrustedURL(url)) {
             log.warn('[Security] Blocked view-content for untrusted URL:', url);
             return;

@@ -286,8 +286,8 @@ describe('ConfigManager', () => {
   })
 
   describe('port getters', () => {
-    it('getOAuthPort defaults to 3000', () => {
-      expect(configManager.getOAuthPort()).toBe(3000)
+    it('getOAuthPort defaults to 0, so sign-in takes a free port', () => {
+      expect(configManager.getOAuthPort()).toBe(0)
     })
 
     it('getOAuthPort reads env var', () => {

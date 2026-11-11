@@ -320,10 +320,12 @@ class ConfigManager {
     }
 
     /**
-     * Get OAuth callback port
+     * OAuth callback port. Unset means 0: sign-in asks the system for a free
+     * port on 127.0.0.1. Set OAUTH_CALLBACK_PORT only to pin the port, for
+     * example for a Web client registered with a fixed redirect URI.
      */
     getOAuthPort() {
-        return parseInt(process.env.OAUTH_CALLBACK_PORT || '3000', 10);
+        return parseInt(process.env.OAUTH_CALLBACK_PORT || '0', 10);
     }
 
     /**

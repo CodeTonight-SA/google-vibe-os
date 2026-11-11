@@ -19,11 +19,6 @@
       "count": 5
     }
   },
-  "electron/main.js": {
-    "no-unused-vars": {
-      "count": 6
-    }
-  },
   "electron/notification-manager.js": {
     "no-unused-vars": {
       "count": 3
