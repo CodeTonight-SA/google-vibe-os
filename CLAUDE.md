@@ -91,7 +91,7 @@ MCP Servers (google-mcp-servers/)
 | File | Purpose | Location |
 |------|---------|----------|
 | `credentials.json` | Google Cloud OAuth client | `~/.googol-vibe/` |
-| `token.json` | Cached refresh token | `~/.googol-vibe/tokens/` |
+| `token_electron.json` | OAuth tokens, encrypted with Electron safeStorage | `~/.googol-vibe/tokens/` |
 | `config.json` | App settings, onboarding state | `~/.googol-vibe/` |
 
 ### Required Google APIs
@@ -106,14 +106,18 @@ Enable in Google Cloud Console:
 
 ### OAuth Scopes
 
+Exactly the `SCOPES` list in `dashboard/electron/main.js`:
+
 ```text
 gmail.readonly
 calendar.readonly
 drive.readonly
-tasks.readonly
 userinfo.profile
-userinfo.email
+tasks
 ```
+
+Sign-in runs in the user's own browser with a loopback redirect to
+127.0.0.1 and PKCE (`dashboard/electron/google-auth.js`).
 
 ## Development Workflow
 
@@ -224,7 +228,7 @@ Add to your MCP config:
 - Context isolation enabled
 - Preload script for IPC
 - ConfigManager for unified paths
-- Persistent session for Google auth
+- Google sign-in in the system browser (loopback redirect + PKCE), never in an app window
 
 ## Key Files
 
@@ -250,8 +254,8 @@ mv ~/Downloads/client_secret_*.json ~/.googol-vibe/credentials.json
 ### Token Expired / API Error 500
 
 ```bash
-rm ~/.googol-vibe/tokens/token.json
-# Restart app - triggers new auth flow
+rm ~/.googol-vibe/tokens/token_electron.json
+# Restart the app and click Connect - sign-in opens in the browser
 ```
 
 ### Port 5000 Occupied
@@ -287,7 +291,7 @@ Configured in `package.json` under `"build"` key:
 
 - OAuth tokens contain refresh capability - treat as secrets
 - Never log full token contents
-- BrowserView inherits session - Google auth persists
+- The in-app Google page view (BrowserView, `persist:googleos`) keeps its own Google session; sign-in no longer runs there
 - MCP servers run with user's Google permissions
 - All data stays local - no external telemetry by default
 
