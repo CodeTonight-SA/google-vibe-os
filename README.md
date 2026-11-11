@@ -122,7 +122,7 @@ All credentials are stored in `~/.googol-vibe/`:
 ├── credentials.json           # OAuth client (from GCP)
 ├── config.json                # App settings
 └── tokens/
-    └── token.json             # OAuth refresh token
+    └── token_electron.json    # OAuth tokens, encrypted with Electron safeStorage
 ```
 
 ---
@@ -218,8 +218,8 @@ mv ~/Downloads/client_secret_*.json ~/.googol-vibe/credentials.json
 
 Delete cached token and re-authenticate:
 ```bash
-rm ~/.googol-vibe/tokens/token.json
-# Restart app - will trigger new OAuth flow
+rm ~/.googol-vibe/tokens/token_electron.json
+# Restart the app and click Connect: sign-in opens in your browser
 ```
 
 ### Port Conflicts
@@ -227,7 +227,7 @@ rm ~/.googol-vibe/tokens/token.json
 Default ports:
 - Vite: 9000
 - Flask: 5000
-- Electron Auth: 3000
+- Electron sign-in: a free port on 127.0.0.1, picked at each sign-in (set `OAUTH_CALLBACK_PORT` to pin it)
 
 Check for conflicts:
 ```bash
@@ -260,12 +260,13 @@ TOKEN_PATH=~/.googol-vibe/tokens/
 
 ### Required OAuth Scopes
 
+The app requests exactly the scopes in `SCOPES` in `dashboard/electron/main.js`:
+
 - `https://www.googleapis.com/auth/gmail.readonly`
 - `https://www.googleapis.com/auth/calendar.readonly`
 - `https://www.googleapis.com/auth/drive.readonly`
-- `https://www.googleapis.com/auth/tasks.readonly`
 - `https://www.googleapis.com/auth/userinfo.profile`
-- `https://www.googleapis.com/auth/userinfo.email`
+- `https://www.googleapis.com/auth/tasks` (full access: the app creates, updates, completes and deletes tasks)
 
 ---
 
