@@ -44,13 +44,26 @@ function backToApp(consentUrl, params) {
   return fetch(back)
 }
 
-function portRefusesConnections(port) {
+function portRefusesConnections(port, host = '127.0.0.1') {
   return new Promise((resolve) => {
-    const socket = net.connect(port, '127.0.0.1')
+    const socket = net.connect(port, host)
     socket.once('connect', () => { socket.destroy(); resolve(false) })
     socket.once('error', () => resolve(true))
   })
 }
+
+function freePort() {
+  return new Promise((resolve) => {
+    const probe = net.createServer()
+    probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)) })
+  })
+}
+
+const hasIpv6Loopback = await new Promise((resolve) => {
+  const probe = net.createServer()
+  probe.once('error', () => resolve(false))
+  probe.listen(0, '::1', () => probe.close(() => resolve(true)))
+})
 
 const signInWith = (client, openExternal, extra = {}) =>
   signIn({ client, clientType: 'installed', scopes: SCOPES, openExternal, ...extra })
@@ -125,6 +138,24 @@ describe('signIn when the browser comes back with a code', () => {
     })
     expect(strayStatus).toBe(404)
     expect(client.seen.token.code).toBe('real')
+  })
+})
+
+describe('signIn for a Web client, whose redirect names localhost', () => {
+  it.skipIf(!hasIpv6Loopback)('finishes when the browser comes back on ::1, then stops both listeners', async () => {
+    const port = await freePort()
+    const client = fakeGoogleClient()
+    await signIn({
+      client, clientType: 'web', scopes: SCOPES, overridePort: port,
+      openExternal: async (url) => {
+        const state = new URL(url).searchParams.get('state')
+        await fetch(`http://[::1]:${port}/oauth2callback?state=${state}&code=via-ipv6`)
+      },
+    })
+    expect(client.seen.auth.redirect_uri).toBe(`http://localhost:${port}/oauth2callback`)
+    expect(client.seen.token.code).toBe('via-ipv6')
+    expect(await portRefusesConnections(port, '::1')).toBe(true)
+    expect(await portRefusesConnections(port, '127.0.0.1')).toBe(true)
   })
 })
 

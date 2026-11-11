@@ -47,15 +47,37 @@ function loopbackRedirect(clientType, overridePort) {
     return { host: LOOPBACK_HOST, port: overridePort || 0 };
 }
 
-/** Listen on 127.0.0.1 only, never on every network interface. Resolves to the port. */
-function listenOnLoopback(server, port) {
+/** Listen on one loopback address only, never on every network interface. Resolves to the port. */
+function listenOnLoopback(server, port, host = LOOPBACK_HOST) {
     return new Promise((resolve, reject) => {
         server.once('error', reject);
-        server.listen(port, LOOPBACK_HOST, () => {
+        server.listen(port, host, () => {
             server.off('error', reject);
             resolve(server.address().port);
         });
     });
+}
+
+/**
+ * Open the listeners for a redirect. A Web client's redirect names `localhost`,
+ * which a browser may try as ::1 before 127.0.0.1, so it also gets a listener
+ * on ::1, on the same port, when the system has IPv6. Requests to that one are
+ * handled by the first listener's handlers.
+ */
+async function openListeners(redirect) {
+    const primary = http.createServer();
+    const port = await listenOnLoopback(primary, redirect.port);
+    const servers = [primary];
+    if (redirect.host === 'localhost') {
+        const ipv6 = http.createServer((req, res) => primary.emit('request', req, res));
+        try {
+            await listenOnLoopback(ipv6, port, '::1');
+            servers.push(ipv6);
+        } catch {
+            // No IPv6 loopback on this system: 127.0.0.1 alone serves localhost.
+        }
+    }
+    return { port, servers };
 }
 
 function answerRequest(req, res, expectedState, settle) {
@@ -100,12 +122,11 @@ function waitForAnswer(server, expectedState, timeoutMs) {
  */
 async function signIn({ client, clientType, scopes, openExternal, overridePort, timeoutMs = SIGN_IN_TIMEOUT_MS }) {
     const redirect = loopbackRedirect(clientType, overridePort);
-    const server = http.createServer();
-    const port = await listenOnLoopback(server, redirect.port);
+    const { port, servers } = await openListeners(redirect);
     const redirectUri = `http://${redirect.host}:${port}${CALLBACK_PATH}`;
     const state = crypto.randomBytes(16).toString('hex');
     const pkce = createPkcePair();
-    const waiting = waitForAnswer(server, state, timeoutMs);
+    const waiting = waitForAnswer(servers[0], state, timeoutMs);
     try {
         await openExternal(client.generateAuthUrl({
             access_type: 'offline',
@@ -125,7 +146,7 @@ async function signIn({ client, clientType, scopes, openExternal, overridePort, 
         return client;
     } finally {
         waiting.stop();
-        server.close();
+        servers.forEach((server) => server.close());
     }
 }
 
