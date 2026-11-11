@@ -1417,6 +1417,8 @@ body {
     align-items: center;
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Classic scroll bars (Windows, Linux) must not shift the layout sideways. */
+    scrollbar-gutter: stable both-edges;
 }
 
 .step-content {
@@ -1433,15 +1435,15 @@ body {
     margin-block: auto;
 }
 
-/* The action row stays reachable when a step is taller than the window. */
-.onboarding-content > .step-content > .button-row,
-.onboarding-content > .step-content > .primary-button {
+/*
+ * The action row stays reachable when a step is taller than the window.
+ * Only a full-width .button-row is pinned: its background hides the content
+ * that scrolls beneath it, and its bottom padding leaves room for focus rings.
+ */
+.onboarding-content > .step-content > .button-row {
     position: sticky;
     bottom: 0;
     z-index: 1;
-}
-
-.onboarding-content > .step-content > .button-row {
     align-self: stretch;
     justify-content: center;
     padding: 12px 0 4px;
@@ -1961,7 +1963,11 @@ body {
 /* Responsive */
 @media (max-width: 600px) {
     .onboarding-container {
-        padding: 24px;
+        padding: 24px 0 16px;
+    }
+
+    .onboarding-content {
+        padding: 0 16px;
     }
 
     .onboarding-progress {
