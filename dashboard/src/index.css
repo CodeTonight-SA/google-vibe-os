@@ -1297,13 +1297,24 @@ body {
    Onboarding Wizard - Swiss Nihilism
    ========================================================================== */
 
+/*
+ * The wizard is exactly one window tall and never scrolls the page.
+ * Vertical spacing shrinks with the window height (clamp + vh), so every
+ * step fits at the minimum window size. A step that is still taller scrolls
+ * inside .onboarding-content, and its action row stays pinned and visible.
+ */
 .onboarding-container {
-    min-height: 100vh;
+    --onb-gap-xl: clamp(20px, 6vh, 72px);
+    --onb-gap-l: clamp(16px, 4vh, 32px);
+    --onb-gap-s: clamp(8px, 2vh, 16px);
+    box-sizing: border-box;
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 64px 40px;
+    padding: clamp(36px, 7vh, 64px) 0 clamp(16px, 4vh, 40px);
     background: var(--bg-color);
 }
 
@@ -1316,10 +1327,11 @@ body {
 
 /* Progress Indicator - Swiss Grid */
 .onboarding-progress {
+    flex: none;
     display: flex;
     align-items: flex-start;
     gap: 0;
-    margin-bottom: 80px;
+    margin-bottom: var(--onb-gap-xl);
 }
 
 .progress-step {
@@ -1393,9 +1405,20 @@ body {
 }
 
 /* Step Content - Swiss Typography */
+/* The scroll area spans the full width, so its scroll bar sits at the window edge. */
 .onboarding-content {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
-    max-width: 560px;
+    padding: 0 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Classic scroll bars (Windows, Linux) must not shift the layout sideways. */
+    scrollbar-gutter: stable both-edges;
 }
 
 .step-content {
@@ -1403,23 +1426,63 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
+    width: 100%;
+    max-width: 560px;
+}
+
+/* Auto margins centre a short step and let a tall one start at the top. */
+.onboarding-content > .step-content {
+    margin-block: auto;
+}
+
+/*
+ * The action row stays reachable when a step is taller than the window.
+ * Only a full-width .button-row is pinned: its background hides the content
+ * that scrolls beneath it, and its bottom padding leaves room for focus rings.
+ */
+.onboarding-content > .step-content > .button-row {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    align-self: stretch;
+    justify-content: center;
+    padding: 12px 0 4px;
+    background: var(--bg-color);
+}
+
+/* A soft edge above the pinned row, shown only while more content is below. */
+@supports (animation-timeline: scroll()) {
+    .onboarding-content {
+        scroll-timeline: --onboarding-scroll block;
+    }
+
+    .onboarding-content > .step-content > .button-row {
+        animation: onboarding-more-below linear both;
+        animation-timeline: --onboarding-scroll;
+    }
+
+    @keyframes onboarding-more-below {
+        from { box-shadow: 0 -12px 12px -12px rgba(0, 0, 0, 0.18); }
+        to { box-shadow: 0 -12px 12px -12px rgba(0, 0, 0, 0); }
+    }
 }
 
 .step-content h1,
 .step-content h2 {
     font-family: var(--font-display);
-    font-size: 3.5rem;
+    font-size: clamp(2.25rem, 7vh, 3.5rem);
     font-weight: 700;
     color: var(--text-heading);
-    margin: 0 0 16px;
+    margin: 0 0 var(--onb-gap-s);
     letter-spacing: -0.03em;
     line-height: 1;
+    text-wrap: balance;
 }
 
 .step-content p {
     font-family: var(--font-display);
     color: var(--text-secondary);
-    margin-bottom: 32px;
+    margin-bottom: var(--onb-gap-l);
     line-height: 1.5;
     font-size: 1rem;
     font-weight: 400;
@@ -1428,6 +1491,12 @@ body {
 .step-icon {
     color: var(--text-secondary);
     margin-bottom: 8px;
+}
+
+.step-icon,
+.success-icon {
+    width: clamp(32px, 6.5vh, 48px);
+    height: clamp(32px, 6.5vh, 48px);
 }
 
 .success-icon {
@@ -1440,7 +1509,7 @@ body {
 }
 
 .ready-step .success-animation {
-    margin-bottom: 32px;
+    margin-bottom: var(--onb-gap-l);
 }
 
 .ready-step .sparkle-icon {
@@ -1452,7 +1521,7 @@ body {
     font-family: var(--font-display);
     font-size: 0.875rem;
     color: var(--text-secondary);
-    margin-bottom: 48px;
+    margin-bottom: clamp(16px, 5vh, 48px);
     font-weight: 400;
 }
 
@@ -1468,7 +1537,7 @@ body {
     gap: 0;
     width: 100%;
     max-width: 320px;
-    margin: 0 auto 48px;
+    margin: 0 auto clamp(16px, 5vh, 48px);
     border-top: 1px solid #e0e0e0;
 }
 
@@ -1476,7 +1545,7 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 16px 0;
+    padding: clamp(8px, 1.8vh, 16px) 0;
     width: 100%;
     border-bottom: 1px solid #e0e0e0;
 }
@@ -1502,7 +1571,7 @@ body {
     font-family: var(--font-display);
     font-size: 0.8125rem;
     color: var(--muted);
-    margin-top: 48px;
+    margin-top: clamp(16px, 5vh, 48px);
     font-weight: 400;
 }
 
@@ -1529,11 +1598,13 @@ body {
 
 /* Welcome Step */
 .welcome-step .welcome-logo {
-    margin-bottom: 16px;
+    margin-bottom: var(--onb-gap-s);
 }
 
 .welcome-step .logo-icon {
     color: var(--accent-primary);
+    width: clamp(40px, 8vh, 64px);
+    height: clamp(40px, 8vh, 64px);
 }
 
 .welcome-subtitle {
@@ -1544,7 +1615,7 @@ body {
 .feature-grid {
     display: flex;
     gap: 24px;
-    margin: 32px 0;
+    margin: var(--onb-gap-l) 0;
 }
 
 .feature-item {
@@ -1552,7 +1623,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 16px 24px;
+    padding: clamp(10px, 2.4vh, 16px) 24px;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
@@ -1572,7 +1643,7 @@ body {
 .setup-time {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    margin-bottom: 32px;
+    margin-bottom: var(--onb-gap-l);
 }
 
 /* Buttons - Swiss Nihilism */
@@ -1635,7 +1706,7 @@ body {
     font-size: 0.875rem;
     cursor: pointer;
     padding: 8px 0;
-    margin-top: 24px;
+    margin-top: clamp(8px, 2vh, 24px);
 }
 
 .text-button:hover {
@@ -1652,7 +1723,7 @@ body {
     font-size: 0.875rem;
     cursor: pointer;
     padding: 8px 0;
-    margin-bottom: 24px;
+    margin-bottom: clamp(4px, 2vh, 24px);
 }
 
 .link-button:hover {
@@ -1662,14 +1733,14 @@ body {
 .button-row {
     display: flex;
     gap: 16px;
-    margin-top: 32px;
+    margin-top: clamp(4px, 2vh, 20px);
 }
 
 /* Choice Cards (GCP Setup) */
 .choice-cards {
     display: flex;
     gap: 16px;
-    margin: 24px 0;
+    margin: clamp(12px, 3vh, 24px) 0;
     width: 100%;
 }
 
@@ -1726,7 +1797,7 @@ body {
 /* Checklist */
 .checklist {
     width: 100%;
-    margin: 16px 0 24px;
+    margin: var(--onb-gap-s) 0 clamp(8px, 3vh, 24px);
     text-align: left;
 }
 
@@ -1734,10 +1805,10 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
+    padding: clamp(8px, 1.6vh, 12px) 16px;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    margin-bottom: 8px;
+    margin-bottom: clamp(4px, 1vh, 8px);
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -1892,7 +1963,11 @@ body {
 /* Responsive */
 @media (max-width: 600px) {
     .onboarding-container {
-        padding: 24px;
+        padding: 24px 0 16px;
+    }
+
+    .onboarding-content {
+        padding: 0 16px;
     }
 
     .onboarding-progress {
