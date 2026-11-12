@@ -29,15 +29,22 @@ app, or move `~/.googol-vibe/tokens/token_electron.json` aside.
 2. Check that Google's consent page opens in your default browser, not in a
    window of the app, and that the address bar shows `accounts.google.com`.
 3. Approve. Check that the browser tab says "You are signed in", and that
-   the app comes back to the front and finishes onboarding.
+   the app comes back to the front and shows the email address of the
+   account you signed in with.
 4. Check that the app no longer listens for the callback. On macOS and Linux,
    `lsof -nP -a -iTCP -sTCP:LISTEN -c Googol` prints nothing. On Windows,
    `netstat -ano | findstr LISTENING` shows no line with the app's process ID.
 5. Check that `main.log` contains no access token or refresh token. On macOS
    it is `~/Library/Logs/googol-vibe/main.log`.
-6. Sign out, click Connect again and click Cancel on Google's page. Check that
-   the app shows the error and that Connect works again.
-7. Optional, it takes 5 minutes: click Connect and close the browser tab
+6. Sign out. Check that `main.log` says `Google access revoked at sign-out: yes`,
+   and that Googol Vibe no longer appears among the third-party apps at
+   https://myaccount.google.com/permissions.
+7. Click Connect, then click Cancel sign-in in the app without answering
+   Google. Check that the app stops waiting at once, shows no error, and that
+   Connect works again.
+8. Click Connect and click Cancel on Google's page. Check that the app shows
+   the error and that Connect works again.
+9. Optional, it takes 5 minutes: click Connect and close the browser tab
    without answering. Check that the app reports that sign-in timed out and
    that Connect works again.
 

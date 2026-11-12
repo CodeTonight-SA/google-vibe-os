@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Authentication
     // ========================================
     login: () => ipcRenderer.invoke('google-login'),
+    cancelLogin: () => ipcRenderer.invoke('google-login-cancel'),
     logout: () => ipcRenderer.invoke('logout'),
     getProfile: () => ipcRenderer.invoke('get-profile'),
 

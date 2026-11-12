@@ -260,13 +260,15 @@ TOKEN_PATH=~/.googol-vibe/tokens/
 
 ### Required OAuth Scopes
 
-The app requests exactly the scopes in `SCOPES` in `dashboard/electron/main.js`:
+The app requests exactly the scopes in `dashboard/electron/scopes.js`:
 
+- `openid`, `email` and `profile`: who is signed in (the connected email address, name and picture)
 - `https://www.googleapis.com/auth/gmail.readonly`
 - `https://www.googleapis.com/auth/calendar.readonly`
 - `https://www.googleapis.com/auth/drive.readonly`
-- `https://www.googleapis.com/auth/userinfo.profile`
 - `https://www.googleapis.com/auth/tasks` (full access: the app creates, updates, completes and deletes tasks)
+
+Signing out asks Google to revoke the app's access before the stored token is deleted.
 
 ---
 
