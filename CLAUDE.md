@@ -106,18 +106,20 @@ Enable in Google Cloud Console:
 
 ### OAuth Scopes
 
-Exactly the `SCOPES` list in `dashboard/electron/main.js`:
+Exactly the lists in `dashboard/electron/scopes.js`:
 
 ```text
-gmail.readonly
-calendar.readonly
-drive.readonly
-userinfo.profile
-tasks
+openid email profile    BASIC: who is signed in
+gmail.readonly          DATA: read-only
+calendar.readonly       DATA: read-only
+drive.readonly          DATA: read-only
+tasks                   DATA: full access, because the app writes tasks
 ```
 
 Sign-in runs in the user's own browser with a loopback redirect to
-127.0.0.1 and PKCE (`dashboard/electron/google-auth.js`).
+127.0.0.1 and PKCE (`dashboard/electron/google-auth.js`). Cancel in the
+app stops a sign-in that is waiting for the browser, and sign-out revokes
+the app's access with Google before it deletes the token.
 
 ## Development Workflow
 
