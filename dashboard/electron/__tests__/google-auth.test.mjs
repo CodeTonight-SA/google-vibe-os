@@ -11,7 +11,7 @@ import http from 'http'
 import net from 'net'
 
 const require = createRequire(import.meta.url)
-const { signIn, revokeAccess, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback } = require('../google-auth.js')
+const { signIn, revokeAccess, exchangeCode, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback } = require('../google-auth.js')
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -275,6 +275,39 @@ describe('signIn when the user clicks Cancel in the app', () => {
     expect(client.seen.credentials).toBeUndefined()
     expect(await (await browser.response).text()).toMatch(/did not finish/)
     expect(await portRefusesConnections(listeningPort(client))).toBe(true)
+  })
+})
+
+// Raised in review: the token exchange and a Cancel at an exact moment. These
+// call exchangeCode directly, with a stand-in for the browser's waiting request.
+describe('exchangeCode when the user clicks Cancel', () => {
+  function heldRequest() {
+    const res = { writeHead(status) { res.status = status; return res }, end(body) { res.body = body } }
+    return res
+  }
+  const exchangeWith = (client, res, signal) =>
+    exchangeCode({ client, code: 'c', res, verifier: 'v', redirectUri: 'http://127.0.0.1:1/oauth2callback', signal })
+
+  it('starts no token exchange when the sign-in was already cancelled', async () => {
+    const cancel = new AbortController()
+    cancel.abort()
+    const client = fakeGoogleClient()
+    const res = heldRequest()
+    await expect(exchangeWith(client, res, cancel.signal)).rejects.toThrow(/cancelled/)
+    expect(client.seen.token).toBeUndefined()
+    expect(res.body).toMatch(/did not finish/)
+  })
+
+  it('keeps no token when Google answers after the cancel', async () => {
+    const cancel = new AbortController()
+    const client = fakeGoogleClient(() => pause(40))
+    const res = heldRequest()
+    setTimeout(() => cancel.abort(), 10)
+    await expect(exchangeWith(client, res, cancel.signal)).rejects.toThrow(/cancelled/)
+    await pause(60)
+    expect(client.seen.token).toBeDefined()
+    expect(client.seen.credentials).toBeUndefined()
+    expect(res.body).toMatch(/did not finish/)
   })
 })
 

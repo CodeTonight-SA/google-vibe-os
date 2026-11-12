@@ -148,6 +148,9 @@ function waitForAnswer(server, expectedState, timeoutMs, signal) {
 async function exchangeCode({ client, code, res, verifier, redirectUri, signal }) {
     let outcome = FAILED_PAGE;
     try {
+        // A cancel that came after the browser answered but before this point
+        // means no exchange at all, so Google issues no tokens for it.
+        throwIfCancelled(signal);
         const exchange = client.getToken({ code, codeVerifier: verifier, redirect_uri: redirectUri });
         const { tokens } = await Promise.race([exchange, whenCancelled(signal)]);
         client.setCredentials(tokens);
@@ -223,4 +226,5 @@ async function revokeAccess(client, timeoutMs = REVOKE_TIMEOUT_MS) {
     }
 }
 
-module.exports = { signIn, revokeAccess, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback };
+// exchangeCode is exported for its own tests, which drive a cancel at an exact moment.
+module.exports = { signIn, revokeAccess, exchangeCode, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback };
