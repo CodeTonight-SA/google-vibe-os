@@ -278,6 +278,33 @@ describe('signIn when the user clicks Cancel in the app', () => {
   })
 })
 
+// Raised in review: a browser request already in flight when the sign-in is
+// cancelled. It is held half-sent until the cancel has closed the listener.
+describe('signIn when the browser answers after a cancel', () => {
+  it('sends the failure page at once rather than leaving the tab waiting', async () => {
+    const cancel = new AbortController()
+    const client = fakeGoogleClient()
+    const received = []
+    let socket
+    await expect(signInWith(client, async (url) => {
+      const consent = new URL(url)
+      const back = new URL(consent.searchParams.get('redirect_uri'))
+      socket = net.connect(Number(back.port), '127.0.0.1')
+      socket.on('error', () => {})
+      socket.on('data', (chunk) => received.push(chunk.toString()))
+      await new Promise((resolve) => socket.once('connect', resolve))
+      socket.write(`GET /oauth2callback?state=${consent.searchParams.get('state')}&code=late HTTP/1.1\r\nHost: 127.0.0.1\r\n`)
+      await pause(20)
+      cancel.abort()
+    }, { signal: cancel.signal })).rejects.toThrow(/cancelled/)
+    socket.write('\r\n')
+    await pause(100)
+    socket.destroy()
+    expect(received.join('')).toMatch(/did not finish/)
+    expect(client.seen.token).toBeUndefined()
+  })
+})
+
 // Raised in review: the token exchange and a Cancel at an exact moment. These
 // call exchangeCode directly, with a stand-in for the browser's waiting request.
 describe('exchangeCode when the user clicks Cancel', () => {

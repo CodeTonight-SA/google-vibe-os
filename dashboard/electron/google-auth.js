@@ -122,10 +122,14 @@ function answerRequest(req, res, expectedState, settle) {
 function waitForAnswer(server, expectedState, timeoutMs, signal) {
     let timer;
     let state = expectedState;
+    let ended = false;
     const fromBrowser = new Promise((resolve, reject) => {
         timer = setTimeout(() => reject(new Error('Sign-in timed out: the browser did not come back')), timeoutMs);
         server.on('request', (req, res) => answerRequest(req, res, state, (result) => {
             if (!result.ok) return reject(new Error(result.error));
+            // A code that arrives once the sign-in was cancelled or timed out is
+            // never exchanged, so its page goes out now instead of never.
+            if (ended) return sendPage(res, FAILED_PAGE);
             // Only the first answer counts. A repeat of it (a reload of the tab)
             // is now foreign, so it gets a 404 instead of waiting forever.
             state = null;
@@ -133,9 +137,10 @@ function waitForAnswer(server, expectedState, timeoutMs, signal) {
         }));
     });
     const answer = Promise.race([fromBrowser, whenCancelled(signal)]);
-    // signIn awaits `answer` on its main path. This handler only stops an early
-    // exit (the browser could not be opened) from leaving an unhandled rejection.
-    answer.catch(() => {});
+    // Marks the wait as over when it fails (timeout, cancel or an error from
+    // Google). It also stops an early exit (the browser could not be opened)
+    // from leaving an unhandled rejection.
+    answer.catch(() => { ended = true; });
     return { answer, stop: () => clearTimeout(timer) };
 }
 
