@@ -15,6 +15,7 @@ const { safeHandle } = require('./ipc-safety');
 const tokenStorage = require('./token-storage');
 const { isValidGoogleId } = require('./validators');
 const googleAuth = require('./google-auth');
+const scopes = require('./scopes');
 const urlTrust = require('./url-trust');
 
 log.info('[Googol Vibe] App starting — log transport active');
@@ -54,15 +55,6 @@ function isTrustedURL(urlString) {
 // TOKEN_PATH was: path.join(app.getPath('userData'), 'token.json')
 // CREDENTIALS_PATH was: path.join(__dirname, '../credentials.json')
 
-// Scopes
-const SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/calendar.readonly',
-    'https://www.googleapis.com/auth/drive.readonly',
-    'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/tasks',
-];
-
 // The credentials file holds one OAuth client: a Desktop client under
 // "installed", or a Web client under "web".
 async function readClientFile() {
@@ -84,23 +76,34 @@ async function createOAuthClient() {
     return { client, clientType: file.type };
 }
 
+// The sign-in that is waiting for the browser, so that Cancel in the app can stop it.
+let signInController = null;
+
 // Sign in through the user's own browser (see google-auth.js), then bring the
-// app back to the front.
+// app back to the front. A new sign-in first cancels one that is still waiting.
 async function signInWithGoogle() {
-    const { client, clientType } = await createOAuthClient();
-    const signedIn = await googleAuth.signIn({
-        client,
-        clientType,
-        scopes: SCOPES,
-        openExternal: (consentUrl) => shell.openExternal(consentUrl),
-        overridePort: configManager.getOAuthPort(),
-    });
-    if (mainWindow) {
-        mainWindow.show();
-        mainWindow.focus();
+    signInController?.abort();
+    const controller = new AbortController();
+    signInController = controller;
+    try {
+        const { client, clientType } = await createOAuthClient();
+        const signedIn = await googleAuth.signIn({
+            client,
+            clientType,
+            scopes: scopes.SIGN_IN,
+            openExternal: (consentUrl) => shell.openExternal(consentUrl),
+            overridePort: configManager.getOAuthPort(),
+            signal: controller.signal,
+        });
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+        app.focus({ steal: true });
+        return signedIn;
+    } finally {
+        if (signInController === controller) signInController = null;
     }
-    app.focus({ steal: true });
-    return signedIn;
 }
 
 async function loadSavedCredentialsIfExist() {
@@ -601,6 +604,13 @@ app.on('ready', () => {
         return { success: true };
     });
 
+    // Cancel in the app: stop waiting for the browser. The google-login call that
+    // is waiting then fails with "Sign-in was cancelled".
+    safeHandle('google-login-cancel', async () => {
+        signInController?.abort();
+        return { success: true };
+    });
+
     safeHandle('get-profile', async () => {
         if (!authClient) authClient = await loadSavedCredentialsIfExist();
         if (!authClient) throw new Error('Not authenticated');
@@ -987,6 +997,10 @@ app.on('ready', () => {
     });
 
     safeHandle('logout', async () => {
+        // Ask Google to end the app's access before the token is deleted. This
+        // never throws and gives up after a few seconds, so sign-out works offline.
+        const revoked = await googleAuth.revokeAccess(authClient || await loadSavedCredentialsIfExist());
+        log.info(`[Auth] Google access revoked at sign-out: ${revoked ? 'yes' : 'no'}`);
         try {
             // Remove token from new location
             const tokenPath = configManager.getTokenPath();

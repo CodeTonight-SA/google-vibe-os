@@ -2,7 +2,8 @@
  * Sign-in through the system browser: PKCE, a 127.0.0.1 loopback redirect, and
  * stand-ins for Google and the browser, so the whole flow runs without either.
  * Mutation-sensitive: dropping PKCE, the state check, the loopback-only bind,
- * the timeout or the server shutdown turns a test red.
+ * the timeout, the cancel, the late answer to the browser (#28) or the server
+ * shutdown turns a test red.
  */
 import { describe, it, expect } from 'vitest'
 import { createRequire } from 'module'
@@ -10,13 +11,15 @@ import http from 'http'
 import net from 'net'
 
 const require = createRequire(import.meta.url)
-const { signIn, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback } = require('../google-auth.js')
+const { signIn, revokeAccess, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback } = require('../google-auth.js')
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // Stands in for google-auth-library's OAuth2Client: it builds the consent URL
-// from the options it gets, and records the code exchange.
-function fakeGoogleClient() {
+// from the options it gets, and records the code exchange. `exchange` runs
+// inside the exchange, to delay it, fail it or cancel part-way through.
+function fakeGoogleClient(exchange = async () => {}) {
   const seen = {}
   return {
     seen,
@@ -28,6 +31,7 @@ function fakeGoogleClient() {
     },
     async getToken(opts) {
       seen.token = opts
+      await exchange()
       return { tokens: { access_token: 'access', refresh_token: 'refresh' } }
     },
     setCredentials(tokens) { seen.credentials = tokens },
@@ -42,6 +46,18 @@ function backToApp(consentUrl, params) {
   const all = { state: u.searchParams.get('state'), ...params }
   for (const [k, v] of Object.entries(all)) back.searchParams.set(k, v)
   return fetch(back)
+}
+
+// Electron's shell.openExternal resolves once the browser has the page, long
+// before the user answers Google. This stand-in does the same: it sends the
+// browser back to the app and keeps the response for the test to read later.
+function browserReturning(params) {
+  const browser = {}
+  browser.openExternal = async (url) => {
+    browser.url = url
+    browser.response = backToApp(url, params)
+  }
+  return browser
 }
 
 function portRefusesConnections(port, host = '127.0.0.1') {
@@ -67,6 +83,8 @@ const hasIpv6Loopback = await new Promise((resolve) => {
 
 const signInWith = (client, openExternal, extra = {}) =>
   signIn({ client, clientType: 'installed', scopes: SCOPES, openExternal, ...extra })
+
+const listeningPort = (client) => Number(new URL(client.seen.auth.redirect_uri).port)
 
 describe('PKCE (RFC 7636)', () => {
   it('derives the S256 challenge given in RFC 7636 appendix B', () => {
@@ -108,10 +126,10 @@ describe('loopback redirect', () => {
 describe('signIn when the browser comes back with a code', () => {
   it('opens the consent page in the browser with PKCE, offline access and incremental scopes', async () => {
     const client = fakeGoogleClient()
-    let consentUrl
-    await signInWith(client, async (url) => { consentUrl = url; await backToApp(url, { code: 'the-code' }) })
+    const browser = browserReturning({ code: 'the-code' })
+    await signInWith(client, browser.openExternal)
     const { auth, token } = client.seen
-    expect(consentUrl).toMatch(/^https:\/\/accounts\.google\.com\//)
+    expect(browser.url).toMatch(/^https:\/\/accounts\.google\.com\//)
     expect(auth).toMatchObject({
       access_type: 'offline', prompt: 'consent', include_granted_scopes: true,
       code_challenge_method: 'S256', scope: SCOPES,
@@ -124,20 +142,55 @@ describe('signIn when the browser comes back with a code', () => {
 
   it('stops listening once the user is signed in', async () => {
     const client = fakeGoogleClient()
-    await signInWith(client, (url) => backToApp(url, { code: 'c' }))
-    const port = Number(new URL(client.seen.auth.redirect_uri).port)
-    expect(await portRefusesConnections(port)).toBe(true)
+    await signInWith(client, browserReturning({ code: 'c' }).openExternal)
+    expect(await portRefusesConnections(listeningPort(client))).toBe(true)
   })
 
   it('ignores a request that is not the answer, then finishes on the real one', async () => {
     const client = fakeGoogleClient()
     let strayStatus
+    let real
     await signInWith(client, async (url) => {
       strayStatus = (await backToApp(url, { code: 'forged', state: 'not-ours' })).status
-      await backToApp(url, { code: 'real' })
+      real = backToApp(url, { code: 'real' })
     })
     expect(strayStatus).toBe(404)
     expect(client.seen.token.code).toBe('real')
+    expect((await real).status).toBe(200)
+  })
+})
+
+describe('signIn answers the browser only after the token exchange (#28)', () => {
+  it('shows the signed-in page once the tokens have arrived', async () => {
+    const client = fakeGoogleClient(() => pause(50))
+    let tokensSetWhenAnswered
+    let response
+    await signInWith(client, async (url) => {
+      response = backToApp(url, { code: 'c' }).then((res) => {
+        tokensSetWhenAnswered = 'credentials' in client.seen
+        return res
+      })
+    })
+    expect(await (await response).text()).toMatch(/You are signed in/)
+    expect(tokensSetWhenAnswered).toBe(true)
+  })
+
+  it('shows the failure page when the token exchange fails', async () => {
+    const client = fakeGoogleClient(async () => { throw new Error('invalid_grant') })
+    const browser = browserReturning({ code: 'c' })
+    await expect(signInWith(client, browser.openExternal)).rejects.toThrow(/invalid_grant/)
+    expect(await (await browser.response).text()).toMatch(/did not finish/)
+    expect(client.seen.credentials).toBeUndefined()
+  })
+
+  it('answers a repeat of the answer, such as a reload of the tab, with a 404', async () => {
+    const client = fakeGoogleClient(() => pause(100))
+    const browser = browserReturning({ code: 'c' })
+    const signingIn = signInWith(client, browser.openExternal)
+    while (!client.seen.token) await pause(5)
+    expect((await backToApp(browser.url, { code: 'c' })).status).toBe(404)
+    await signingIn
+    expect((await browser.response).status).toBe(200)
   })
 })
 
@@ -145,15 +198,17 @@ describe('signIn for a Web client, whose redirect names localhost', () => {
   it.skipIf(!hasIpv6Loopback)('finishes when the browser comes back on ::1, then stops both listeners', async () => {
     const port = await freePort()
     const client = fakeGoogleClient()
+    let response
     await signIn({
       client, clientType: 'web', scopes: SCOPES, overridePort: port,
       openExternal: async (url) => {
         const state = new URL(url).searchParams.get('state')
-        await fetch(`http://[::1]:${port}/oauth2callback?state=${state}&code=via-ipv6`)
+        response = fetch(`http://[::1]:${port}/oauth2callback?state=${state}&code=via-ipv6`)
       },
     })
     expect(client.seen.auth.redirect_uri).toBe(`http://localhost:${port}/oauth2callback`)
     expect(client.seen.token.code).toBe('via-ipv6')
+    expect((await response).status).toBe(200)
     expect(await portRefusesConnections(port, '::1')).toBe(true)
     expect(await portRefusesConnections(port, '127.0.0.1')).toBe(true)
   })
@@ -170,8 +225,7 @@ describe('signIn when the browser does not come back with a code', () => {
   it('gives up and stops listening when the browser never comes back', async () => {
     const client = fakeGoogleClient()
     await expect(signInWith(client, async () => {}, { timeoutMs: 50 })).rejects.toThrow(/timed out/)
-    const port = Number(new URL(client.seen.auth.redirect_uri).port)
-    expect(await portRefusesConnections(port)).toBe(true)
+    expect(await portRefusesConnections(listeningPort(client))).toBe(true)
   })
 
   it('exchanges no code when the browser cannot be opened', async () => {
@@ -179,5 +233,70 @@ describe('signIn when the browser does not come back with a code', () => {
     await expect(signInWith(client, async () => { throw new Error('no default browser') }))
       .rejects.toThrow(/no default browser/)
     expect(client.seen.token).toBeUndefined()
+  })
+})
+
+describe('signIn when the user clicks Cancel in the app', () => {
+  it('stops waiting and stops listening, and exchanges nothing', async () => {
+    const client = fakeGoogleClient()
+    const cancel = new AbortController()
+    await expect(signInWith(client, async () => { cancel.abort() }, { signal: cancel.signal }))
+      .rejects.toThrow(/cancelled/)
+    expect(client.seen.token).toBeUndefined()
+    expect(await portRefusesConnections(listeningPort(client))).toBe(true)
+  })
+
+  it('does not open the browser when the cancel came first', async () => {
+    const cancel = new AbortController()
+    cancel.abort()
+    let opened = false
+    await expect(signInWith(fakeGoogleClient(), async () => { opened = true }, { signal: cancel.signal }))
+      .rejects.toThrow(/cancelled/)
+    expect(opened).toBe(false)
+  })
+
+  it('keeps no token when the cancel arrives during the token exchange', async () => {
+    const cancel = new AbortController()
+    const client = fakeGoogleClient(async () => { cancel.abort() })
+    const browser = browserReturning({ code: 'c' })
+    await expect(signInWith(client, browser.openExternal, { signal: cancel.signal })).rejects.toThrow(/cancelled/)
+    expect(client.seen.credentials).toBeUndefined()
+    expect(await (await browser.response).text()).toMatch(/did not finish/)
+  })
+})
+
+describe('revokeAccess at sign-out', () => {
+  function revocableClient(credentials, revoke = async () => ({})) {
+    const revoked = []
+    return { revoked, credentials, async revokeToken(token) { revoked.push(token); return revoke() } }
+  }
+
+  it('revokes the refresh token when there is one', async () => {
+    const client = revocableClient({ access_token: 'a', refresh_token: 'r' })
+    expect(await revokeAccess(client)).toBe(true)
+    expect(client.revoked).toEqual(['r'])
+  })
+
+  it('falls back to the access token', async () => {
+    const client = revocableClient({ access_token: 'a' })
+    expect(await revokeAccess(client)).toBe(true)
+    expect(client.revoked).toEqual(['a'])
+  })
+
+  it('reports false, without throwing, when Google refuses or the network is down', async () => {
+    const client = revocableClient({ refresh_token: 'r' }, async () => { throw new Error('invalid_token') })
+    expect(await revokeAccess(client)).toBe(false)
+  })
+
+  it('gives up after its time limit, so sign-out never hangs', async () => {
+    const client = revocableClient({ refresh_token: 'r' }, () => new Promise(() => {}))
+    expect(await revokeAccess(client, 20)).toBe(false)
+  })
+
+  it('does nothing when there is no token or no client', async () => {
+    const client = revocableClient({})
+    expect(await revokeAccess(client)).toBe(false)
+    expect(client.revoked).toEqual([])
+    expect(await revokeAccess(null)).toBe(false)
   })
 })

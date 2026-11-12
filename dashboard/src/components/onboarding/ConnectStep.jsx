@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, LogIn, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { User, LogIn, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Loader2, X } from 'lucide-react';
 
 export default function ConnectStep({ onNext, onBack, data }) {
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState(null);
+    // Set when the user clicks Cancel, so the failed login it causes shows no error.
+    const cancelled = useRef(false);
 
     const handleConnect = async () => {
+        cancelled.current = false;
         setIsConnecting(true);
         setError(null);
 
@@ -20,14 +23,19 @@ export default function ConnectStep({ onNext, onBack, data }) {
                     isConnected: true,
                     connectedEmail: profile.email,
                 });
-            } else {
+            } else if (!cancelled.current) {
                 setError(result.error || 'Failed to connect to Google');
             }
         } catch (err) {
-            setError(err.message);
+            if (!cancelled.current) setError(err.message);
         } finally {
             setIsConnecting(false);
         }
+    };
+
+    const handleCancel = () => {
+        cancelled.current = true;
+        window.electronAPI.cancelLogin();
     };
 
     if (data.isConnected) {
@@ -58,10 +66,11 @@ export default function ConnectStep({ onNext, onBack, data }) {
             <div className="permission-list">
                 <h4>Googol Vibe will request access to:</h4>
                 <ul>
+                    <li>See your email address, name and picture</li>
                     <li>Read your Gmail messages</li>
                     <li>View your Calendar events</li>
                     <li>View your Drive files</li>
-                    <li>View your Tasks</li>
+                    <li>Read and manage your Tasks</li>
                 </ul>
             </div>
 
@@ -75,7 +84,7 @@ export default function ConnectStep({ onNext, onBack, data }) {
                 {isConnecting ? (
                     <>
                         <Loader2 size={20} className="spin" />
-                        Connecting...
+                        Finish signing in in your browser
                     </>
                 ) : (
                     <>
@@ -84,6 +93,13 @@ export default function ConnectStep({ onNext, onBack, data }) {
                     </>
                 )}
             </motion.button>
+
+            {isConnecting && (
+                <button className="text-button" onClick={handleCancel}>
+                    <X size={16} />
+                    Cancel sign-in
+                </button>
+            )}
 
             {error && (
                 <motion.div
@@ -97,7 +113,7 @@ export default function ConnectStep({ onNext, onBack, data }) {
             )}
 
             <div className="help-text">
-                <p>A browser window will open for Google authentication.</p>
+                <p>Google sign-in opens in your web browser. Googol Vibe waits up to 5 minutes for you to finish there.</p>
                 <p>Your data stays on your device - we never store it on external servers.</p>
             </div>
 

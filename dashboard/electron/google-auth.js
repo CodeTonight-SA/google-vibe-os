@@ -19,6 +19,8 @@ const { parseOAuthCallback, CALLBACK_PATH } = require('./oauth-callback');
 const LOOPBACK_HOST = '127.0.0.1';
 const LEGACY_WEB_CLIENT_PORT = 3000;
 const SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
+const REVOKE_TIMEOUT_MS = 5000;
+const CANCELLED = 'Sign-in was cancelled';
 
 const page = (message) => '<!doctype html><meta charset="utf-8"><title>Googol Vibe</title>'
     + `<p style="font:16px system-ui,sans-serif;margin:4rem auto;max-width:32rem">${message}</p>`;
@@ -80,6 +82,16 @@ async function openListeners(redirect) {
     return { port, servers };
 }
 
+/** Stop here if the user has clicked Cancel in the app. */
+function throwIfCancelled(signal) {
+    if (signal?.aborted) throw new Error(CANCELLED);
+}
+
+function sendPage(res, html) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
+}
+
 function answerRequest(req, res, expectedState, settle) {
     const result = parseOAuthCallback(req.url || '', expectedState);
     if (result.foreign) {
@@ -88,25 +100,61 @@ function answerRequest(req, res, expectedState, settle) {
         res.writeHead(404).end();
         return;
     }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(result.ok ? SIGNED_IN_PAGE : FAILED_PAGE);
+    // A code still has to be exchanged for tokens, so its page waits for that
+    // result (see exchangeCode). Anything else has failed already.
+    if (!result.ok) sendPage(res, FAILED_PAGE);
     settle(result);
 }
 
-/** Wait for the browser to come back with our state, or give up after timeoutMs. */
-function waitForAnswer(server, expectedState, timeoutMs) {
+/**
+ * Wait for the browser to come back with our state. Gives up after timeoutMs,
+ * and stops when the signal reports a cancel. Resolves to the code and to the
+ * browser's request, which is still waiting for its page.
+ */
+function waitForAnswer(server, expectedState, timeoutMs, signal) {
     let timer;
+    let cancel;
+    let state = expectedState;
     const answer = new Promise((resolve, reject) => {
         timer = setTimeout(() => reject(new Error('Sign-in timed out: the browser did not come back')), timeoutMs);
-        server.on('request', (req, res) => answerRequest(req, res, expectedState, (result) => {
-            if (result.ok) resolve(result.code);
-            else reject(new Error(result.error));
+        cancel = () => reject(new Error(CANCELLED));
+        signal?.addEventListener('abort', cancel);
+        if (signal?.aborted) cancel();
+        server.on('request', (req, res) => answerRequest(req, res, state, (result) => {
+            if (!result.ok) return reject(new Error(result.error));
+            // Only the first answer counts. A repeat of it (a reload of the tab)
+            // is now foreign, so it gets a 404 instead of waiting forever.
+            state = null;
+            resolve({ code: result.code, res });
         }));
     });
     // signIn awaits `answer` on its main path. This handler only stops an early
     // exit (the browser could not be opened) from leaving an unhandled rejection.
     answer.catch(() => {});
-    return { answer, stop: () => clearTimeout(timer) };
+    const stop = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+    };
+    return { answer, stop };
+}
+
+/**
+ * Exchange the code for tokens, then give the browser's waiting request the page
+ * that matches the result, so the tab never reports a sign-in the app did not
+ * finish (issue #28). A cancel that arrives during the exchange still wins: no
+ * token is kept.
+ */
+async function exchangeCode({ client, code, res, verifier, redirectUri, signal }) {
+    let outcome = FAILED_PAGE;
+    try {
+        const { tokens } = await client.getToken({ code, codeVerifier: verifier, redirect_uri: redirectUri });
+        throwIfCancelled(signal);
+        client.setCredentials(tokens);
+        outcome = SIGNED_IN_PAGE;
+        return client;
+    } finally {
+        sendPage(res, outcome);
+    }
 }
 
 /**
@@ -119,15 +167,17 @@ function waitForAnswer(server, expectedState, timeoutMs) {
  * @param {(url: string) => Promise<void>} o.openExternal - Electron's shell.openExternal
  * @param {number} [o.overridePort] - OAUTH_CALLBACK_PORT, when it is set
  * @param {number} [o.timeoutMs]
+ * @param {AbortSignal} [o.signal] - aborted when the user clicks Cancel in the app
  */
-async function signIn({ client, clientType, scopes, openExternal, overridePort, timeoutMs = SIGN_IN_TIMEOUT_MS }) {
+async function signIn({ client, clientType, scopes, openExternal, overridePort, timeoutMs = SIGN_IN_TIMEOUT_MS, signal }) {
     const redirect = loopbackRedirect(clientType, overridePort);
     const { port, servers } = await openListeners(redirect);
     const redirectUri = `http://${redirect.host}:${port}${CALLBACK_PATH}`;
     const state = crypto.randomBytes(16).toString('hex');
     const pkce = createPkcePair();
-    const waiting = waitForAnswer(servers[0], state, timeoutMs);
+    const waiting = waitForAnswer(servers[0], state, timeoutMs, signal);
     try {
+        throwIfCancelled(signal);
         await openExternal(client.generateAuthUrl({
             access_type: 'offline',
             // Google returns a refresh token only from a consent screen. Sign-in runs
@@ -140,14 +190,36 @@ async function signIn({ client, clientType, scopes, openExternal, overridePort, 
             code_challenge: pkce.challenge,
             code_challenge_method: 'S256',
         }));
-        const code = await waiting.answer;
-        const { tokens } = await client.getToken({ code, codeVerifier: pkce.verifier, redirect_uri: redirectUri });
-        client.setCredentials(tokens);
-        return client;
+        const { code, res } = await waiting.answer;
+        return await exchangeCode({ client, code, res, verifier: pkce.verifier, redirectUri, signal });
     } finally {
         waiting.stop();
         servers.forEach((server) => server.close());
     }
 }
 
-module.exports = { signIn, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback };
+/**
+ * Ask Google to end the app's access to the account, for sign-out. Google
+ * accepts a refresh token or an access token; the refresh token goes first
+ * because the access token expires after an hour. Never throws, and never waits
+ * longer than timeoutMs, so sign-out also finishes offline. Resolves to whether
+ * Google confirmed the revocation.
+ *
+ * @param {object|null} client - an OAuth2Client with the stored tokens set
+ * @param {number} [timeoutMs]
+ */
+async function revokeAccess(client, timeoutMs = REVOKE_TIMEOUT_MS) {
+    const token = client?.credentials?.refresh_token || client?.credentials?.access_token;
+    if (!token) return false;
+    let timer;
+    const giveUp = new Promise((resolve) => { timer = setTimeout(resolve, timeoutMs, false); });
+    try {
+        return await Promise.race([client.revokeToken(token).then(() => true), giveUp]);
+    } catch {
+        return false;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+module.exports = { signIn, revokeAccess, pkceChallenge, createPkcePair, loopbackRedirect, listenOnLoopback };

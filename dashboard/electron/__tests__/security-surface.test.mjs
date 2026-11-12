@@ -36,3 +36,26 @@ describe('credential-import IPC surface (Critical #3)', () => {
     expect(/invoke\(\s*['"]import-credentials-content['"]/.test(preloadSrc)).toBe(true)
   })
 })
+
+// Sign-in runs in the user's own browser (google-auth.js). These fail if
+// main.js goes back to an app window for Google's consent page, or if sign-out
+// stops revoking the app's access before it deletes the token.
+describe('sign-in surface', () => {
+  it('main.js signs in through the system browser, never an app window', () => {
+    expect(mainSrc).not.toMatch(/authWindow/)
+    expect(mainSrc).not.toMatch(/generateAuthUrl/)
+    expect(mainSrc).toMatch(/shell\.openExternal\(consentUrl\)/)
+  })
+
+  it('the renderer can cancel a sign-in that is waiting for the browser', () => {
+    expect(/invoke\(\s*['"]google-login-cancel['"]/.test(preloadSrc)).toBe(true)
+    expect(/safeHandle\(\s*['"]google-login-cancel['"]/.test(mainSrc)).toBe(true)
+  })
+
+  it('logout revokes access with Google before it deletes the token', () => {
+    const logout = mainSrc.slice(mainSrc.indexOf("safeHandle('logout'"))
+    const revoke = logout.indexOf('revokeAccess(')
+    expect(revoke).toBeGreaterThan(-1)
+    expect(logout.indexOf('unlink(')).toBeGreaterThan(revoke)
+  })
+})
