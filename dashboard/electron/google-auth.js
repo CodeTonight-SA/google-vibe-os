@@ -87,6 +87,14 @@ function throwIfCancelled(signal) {
     if (signal?.aborted) throw new Error(CANCELLED);
 }
 
+/** Rejects as soon as the user clicks Cancel in the app; otherwise it never settles. */
+function whenCancelled(signal) {
+    return new Promise((_, reject) => {
+        if (signal?.aborted) reject(new Error(CANCELLED));
+        else signal?.addEventListener('abort', () => reject(new Error(CANCELLED)), { once: true });
+    });
+}
+
 function sendPage(res, html) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
@@ -113,13 +121,9 @@ function answerRequest(req, res, expectedState, settle) {
  */
 function waitForAnswer(server, expectedState, timeoutMs, signal) {
     let timer;
-    let cancel;
     let state = expectedState;
-    const answer = new Promise((resolve, reject) => {
+    const fromBrowser = new Promise((resolve, reject) => {
         timer = setTimeout(() => reject(new Error('Sign-in timed out: the browser did not come back')), timeoutMs);
-        cancel = () => reject(new Error(CANCELLED));
-        signal?.addEventListener('abort', cancel);
-        if (signal?.aborted) cancel();
         server.on('request', (req, res) => answerRequest(req, res, state, (result) => {
             if (!result.ok) return reject(new Error(result.error));
             // Only the first answer counts. A repeat of it (a reload of the tab)
@@ -128,27 +132,24 @@ function waitForAnswer(server, expectedState, timeoutMs, signal) {
             resolve({ code: result.code, res });
         }));
     });
+    const answer = Promise.race([fromBrowser, whenCancelled(signal)]);
     // signIn awaits `answer` on its main path. This handler only stops an early
     // exit (the browser could not be opened) from leaving an unhandled rejection.
     answer.catch(() => {});
-    const stop = () => {
-        clearTimeout(timer);
-        signal?.removeEventListener('abort', cancel);
-    };
-    return { answer, stop };
+    return { answer, stop: () => clearTimeout(timer) };
 }
 
 /**
  * Exchange the code for tokens, then give the browser's waiting request the page
  * that matches the result, so the tab never reports a sign-in the app did not
- * finish (issue #28). A cancel that arrives during the exchange still wins: no
- * token is kept.
+ * finish (issue #28). A cancel during the exchange stops the sign-in at once,
+ * even when Google's token endpoint is slow to answer, and no token is kept.
  */
 async function exchangeCode({ client, code, res, verifier, redirectUri, signal }) {
     let outcome = FAILED_PAGE;
     try {
-        const { tokens } = await client.getToken({ code, codeVerifier: verifier, redirect_uri: redirectUri });
-        throwIfCancelled(signal);
+        const exchange = client.getToken({ code, codeVerifier: verifier, redirect_uri: redirectUri });
+        const { tokens } = await Promise.race([exchange, whenCancelled(signal)]);
         client.setCredentials(tokens);
         outcome = SIGNED_IN_PAGE;
         return client;

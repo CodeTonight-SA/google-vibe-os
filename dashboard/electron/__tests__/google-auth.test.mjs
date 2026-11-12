@@ -263,6 +263,38 @@ describe('signIn when the user clicks Cancel in the app', () => {
     expect(client.seen.credentials).toBeUndefined()
     expect(await (await browser.response).text()).toMatch(/did not finish/)
   })
+
+  it('stops at once when Cancel comes during a token exchange that hangs', async () => {
+    const cancel = new AbortController()
+    const client = fakeGoogleClient(() => new Promise(() => {}))
+    const browser = browserReturning({ code: 'c' })
+    const signingIn = signInWith(client, browser.openExternal, { signal: cancel.signal })
+    while (!client.seen.token) await pause(5)
+    cancel.abort()
+    await expect(signingIn).rejects.toThrow(/cancelled/)
+    expect(client.seen.credentials).toBeUndefined()
+    expect(await (await browser.response).text()).toMatch(/did not finish/)
+    expect(await portRefusesConnections(listeningPort(client))).toBe(true)
+  })
+})
+
+// Raised in review: a revoke that fails after revokeAccess has given up must not
+// surface as an unhandled rejection in the main process.
+describe('revokeAccess after its time limit', () => {
+  it('leaves no unhandled rejection when Google fails late', async () => {
+    const unhandled = []
+    const onUnhandled = (reason) => unhandled.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      const lateFailure = () => pause(30).then(() => { throw new Error('late failure') })
+      const client = { credentials: { refresh_token: 'r' }, revokeToken: lateFailure }
+      expect(await revokeAccess(client, 5)).toBe(false)
+      await pause(60)
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+  })
 })
 
 describe('revokeAccess at sign-out', () => {
