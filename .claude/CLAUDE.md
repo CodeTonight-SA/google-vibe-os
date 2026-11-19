@@ -2,7 +2,7 @@
 
 # Googol Vibe -- GRIP-Enhanced Project Instructions
 
-> Electron Google Workspace dashboard with Swiss Nihilism design. ENTER Konsult internal productivity tool.
+> Electron Google Workspace dashboard with Swiss Nihilism design. CodeTonight internal productivity tool.
 
 ## PARAMOUNT Rules
 
@@ -19,7 +19,7 @@
 |-------|-------|
 | Name | Googol Vibe |
 | Tagline | Your Google Workspace, unified |
-| Owner | ENTER Konsult (CodeTonight) |
+| Owner | CodeTonight (Pty) Ltd |
 | Repo | `CodeTonight-SA/google-vibe-os` |
 | App ID | `com.enterkonsult.googol-vibe` |
 | Design System | Swiss Nihilism (clean, minimal, monochrome) |

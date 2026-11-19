@@ -1,6 +1,6 @@
 # Googol Vibe
 
-ENTER Konsult internal dashboard aggregating Google Workspace (Gmail, Calendar, Drive) into a unified OS-like interface with AI agent capabilities.
+CodeTonight internal dashboard aggregating Google Workspace (Gmail, Calendar, Drive) into a unified OS-like interface with AI agent capabilities.
 
 ## Architecture
 
@@ -299,9 +299,9 @@ Configured in `package.json` under `"build"` key:
 
 ## Team Context
 
-- **Owner**: ENTER Konsult (CodeTonight)
+- **Owner**: CodeTonight (Pty) Ltd
 - **Purpose**: Internal productivity dashboard
-- **Users**: ENTER Konsult team members
+- **Users**: CodeTonight team members
 - **AI Integration**: Vibe Agent + MCP servers
 
 ## Branding
