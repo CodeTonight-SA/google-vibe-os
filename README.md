@@ -283,10 +283,10 @@ Signing out asks Google to revoke the app's access before the stored token is de
 
 ## Contributing
 
-Internal project for ENTER Konsult. Contact the team for access.
+Internal project for CodeTonight. Contact the team for access.
 
 ---
 
 ## Licence
 
-Proprietary. ENTER Konsult (CodeTonight Pty Ltd).
+Proprietary. CodeTonight (Pty) Ltd.

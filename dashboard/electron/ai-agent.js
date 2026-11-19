@@ -82,7 +82,7 @@ function buildSystemPrompt() {
     const name = userProfile?.name || 'User';
     const email = userProfile?.email || '';
     const now = new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' });
-    return `You are Vibe, an AI assistant built into Googol Vibe — a Google Workspace dashboard for ENTER Konsult.
+    return `You are Vibe, an AI assistant built into Googol Vibe — a Google Workspace dashboard for CodeTonight.
 
 User: ${name}${email ? ` <${email}>` : ''}
 App version: ${appVersion}

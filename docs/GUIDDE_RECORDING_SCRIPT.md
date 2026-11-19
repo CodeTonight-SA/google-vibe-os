@@ -182,7 +182,7 @@
 | Action | Narration |
 |--------|-----------|
 | Pan across full dashboard | "That's Googol Vibe - your Google Workspace, unified." |
-| Hover over ENTER Konsult branding (if visible) | "Built by ENTER Konsult for productive professionals." |
+| Hover over CodeTonight branding (if visible) | "Built by CodeTonight for productive professionals." |
 | *(End recording)* | "Get started today." |
 
 ---

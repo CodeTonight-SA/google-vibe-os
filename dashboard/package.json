@@ -4,9 +4,9 @@
     "version": "1.0.0",
     "type": "commonjs",
     "main": "electron/main.js",
-    "description": "Your Google Workspace, unified - ENTER Konsult",
+    "description": "Your Google Workspace, unified - CodeTonight",
     "author": {
-        "name": "ENTER Konsult",
+        "name": "CodeTonight (Pty) Ltd",
         "email": "dev@codetonight.co.za"
     },
     "repository": {
