@@ -56,11 +56,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onRecurringTaskGenerated: (callback) => ipcRenderer.on('recurring-task-generated', (event, data) => callback(data)),
 
     // ========================================
-    // Content Viewing
+    // Google pages (open in the user's browser)
     // ========================================
-    viewContent: (url, type) => ipcRenderer.invoke('view-content', { url, type }),
-    switchToEdit: (docId, docType) => ipcRenderer.invoke('switch-to-edit', { docId, docType }),
-    closeContent: () => ipcRenderer.invoke('close-content'),
+    openGooglePage: (url) => ipcRenderer.invoke('open-google-page', { url }),
 
     // ========================================
     // AI Agent (Streaming)
@@ -138,15 +136,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ========================================
     // Shell
     // ========================================
-    openExternal: (url) => ipcRenderer.invoke('open-external', url),
-
-    // ========================================
-    // Event Listeners
-    // ========================================
-    onContentOpened: (callback) => ipcRenderer.on('content-view-opened', () => callback()),
-    onContentClosed: (callback) => ipcRenderer.on('content-view-closed', () => callback()),
-    removeContentListeners: () => {
-        ipcRenderer.removeAllListeners('content-view-opened');
-        ipcRenderer.removeAllListeners('content-view-closed');
-    }
+    openExternal: (url) => ipcRenderer.invoke('open-external', url)
 });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, BrowserView, dialog } = require('electron');
+const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
@@ -17,6 +17,7 @@ const { isValidGoogleId } = require('./validators');
 const googleAuth = require('./google-auth');
 const scopes = require('./scopes');
 const urlTrust = require('./url-trust');
+const { googlePageUrl } = require('./google-links');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -42,7 +43,6 @@ try {
 
 let mainWindow;
 let authClient;
-let contentView = null; // Track the active BrowserView
 
 // URL trust (navigation / content loading) lives in ./url-trust (pure + tested).
 // localhost is trusted ONLY on the dev-server port, not any localhost port (#11).
@@ -270,6 +270,7 @@ async function fetchGmail(client, maxResults = 5) {
             const headers = detail.data.payload.headers;
             emailList.push({
                 id: msg.id,
+                threadId: msg.threadId,
                 subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
                 from: headers.find(h => h.name === 'From')?.value || 'Unknown',
                 date: headers.find(h => h.name === 'Date')?.value || '',
@@ -385,9 +386,7 @@ const createWindow = () => {
 
     // Set Content Security Policy (production only - Vite HMR needs inline scripts/ws in dev).
     // Deferred (each needs a running-app check): a dev-mode CSP; tightening style-src off
-    // 'unsafe-inline' (React/framer inject inline styles - needs a nonce); a CSP for the
-    // persist:googleos session is intentionally NOT added - it loads Google's own login/Docs
-    // pages, which manage their own CSP, and forcing ours would break them.
+    // 'unsafe-inline' (React/framer inject inline styles - needs a nonce).
     const isDev = process.env.NODE_ENV === 'development';
     if (!isDev) {
         mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
@@ -421,19 +420,11 @@ const createWindow = () => {
         mainWindow.webContents.openDevTools();
     }
 
-    // Permission handler for Meet camera/mic access
+    // The dashboard needs no camera or microphone, because Meet opens in the
+    // user's browser. It may show notifications.
     const ses = mainWindow.webContents.session;
     ses.setPermissionRequestHandler((webContents, permission, callback) => {
-        const allowedPermissions = ['media', 'mediaKeySystem', 'notifications'];
-        callback(allowedPermissions.includes(permission));
-    });
-
-    // Handle window resize to adjust BrowserView if active
-    mainWindow.on('resize', () => {
-        if (contentView) {
-            const bounds = mainWindow.getBounds();
-            contentView.setBounds({ x: 0, y: 80, width: bounds.width, height: bounds.height - 80 });
-        }
+        callback(permission === 'notifications');
     });
 
     // Security: Block navigation to untrusted domains
@@ -868,74 +859,18 @@ app.on('ready', () => {
         return { success: true, rule };
     });
 
-    // Switch document to edit mode
-    safeHandle('switch-to-edit', async (event, { docId, docType }) => {
-        if (!contentView) return;
-
-        // Security: Validate docId contains only safe characters (alphanumeric, hyphens, underscores)
-        if (!docId || !/^[a-zA-Z0-9_-]+$/.test(docId)) {
-            log.warn('[Security] Blocked switch-to-edit with invalid docId:', docId);
-            return;
+    // Google's own pages (a mail, a document, a file, a meeting, Tasks) open in
+    // the user's browser, where the user is already signed in to Google. An app
+    // view has had no Google session since sign-in moved to the browser.
+    safeHandle('open-google-page', async (event, { url } = {}) => {
+        const target = googlePageUrl(url, configManager.getOnboardingState().connectedEmail);
+        if (!target) {
+            log.warn('[Security] Blocked open-google-page for an untrusted URL:', url);
+            return { opened: false };
         }
-
-        const editUrls = {
-            'document': `https://docs.google.com/document/d/${docId}/edit`,
-            'spreadsheet': `https://docs.google.com/spreadsheets/d/${docId}/edit`,
-            'presentation': `https://docs.google.com/presentation/d/${docId}/edit`
-        };
-
-        const editUrl = editUrls[docType];
-        if (editUrl && isTrustedURL(editUrl)) {
-            contentView.webContents.loadURL(editUrl);
-        }
-    });
-
-    safeHandle('view-content', async (event, { url }) => {
-        // Security: Only allow trusted Google domains in the BrowserView
-        // The BrowserView keeps its own Google session (persist:googleos). Sign-in
-        // now runs in the user's browser, so this view no longer inherits it.
-        if (!isTrustedURL(url)) {
-            log.warn('[Security] Blocked view-content for untrusted URL:', url);
-            return;
-        }
-
-        // Meet now uses BrowserView with permission handler (see createWindow)
-        if (contentView) {
-            mainWindow.removeBrowserView(contentView);
-            contentView.webContents.destroy();
-            contentView = null;
-        }
-
-        contentView = new BrowserView({
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: true,
-                webSecurity: true,
-                partition: 'persist:googleos'
-            }
-        });
-
-        mainWindow.setBrowserView(contentView);
-
-        const bounds = mainWindow.getBounds();
-        // Offset y: 80 to leave room for a header/close button in the main window
-        const headerHeight = 80;
-        contentView.setBounds({ x: 0, y: headerHeight, width: bounds.width, height: bounds.height - headerHeight });
-        contentView.setAutoResize({ width: true, height: true });
-
-        contentView.webContents.loadURL(url);
-
-        // Notify renderer that content is open so it can show a "Close" button
-        mainWindow.webContents.send('content-view-opened');
-    });
-
-    safeHandle('close-content', async () => {
-        if (contentView) {
-            mainWindow.removeBrowserView(contentView);
-            contentView = null;
-            mainWindow.webContents.send('content-view-closed');
-        }
+        await shell.openExternal(target);
+        log.info('[Google page] Opened in the browser:', new URL(target).hostname);
+        return { opened: true };
     });
 
     // ========================================
@@ -1020,7 +955,8 @@ app.on('ready', () => {
             if (mainWindow) {
                 await mainWindow.webContents.session.clearStorageData();
             }
-            // Clear both partition sessions (googolvibe = main UI, googleos = auth/BrowserView)
+            // Clear both partition sessions. googolvibe is the main UI; googleos held the
+            // Google session of the in-app viewer in older versions, so clear what they left.
             const uiSession = require('electron').session.fromPartition('persist:googolvibe');
             await uiSession.clearStorageData();
             const authSession = require('electron').session.fromPartition('persist:googleos');

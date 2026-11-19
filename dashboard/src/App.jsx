@@ -9,6 +9,7 @@ import TaskDetailModal from './components/TaskDetailModal';
 import { useToast, ToastContainer } from './components/Toast';
 import SettingsPanel from './components/SettingsPanel';
 import EmptyState from './components/EmptyState';
+import { gmailUrl, docUrl, docType } from './google-urls';
 
 // Skeleton loader - Swiss Nihilism style
 const Skeleton = ({ width = '100%', height = 16, className = '' }) => (
@@ -74,8 +75,6 @@ function App() {
         meetings: true,
         tasks: true
     });
-    const [contentViewOpen, setContentViewOpen] = useState(false);
-    const [currentDoc, setCurrentDoc] = useState(null); // { id, type } for edit button
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [onboardingChecked, setOnboardingChecked] = useState(false);
     const [syncStatus, setSyncStatus] = useState(null);
@@ -229,11 +228,7 @@ function App() {
 
         checkOnboardingAndFetch();
 
-        // Set up listeners for content view state
         if (window.electronAPI) {
-            window.electronAPI.onContentOpened(() => setContentViewOpen(true));
-            window.electronAPI.onContentClosed(() => setContentViewOpen(false));
-
             // Listen for recurring task generation
             window.electronAPI.onRecurringTaskGenerated((data) => {
                 console.log('[Recurrence] Task generated:', data);
@@ -280,9 +275,6 @@ function App() {
 
         return () => {
             if (window.electronAPI) {
-                if (window.electronAPI.removeContentListeners) {
-                    window.electronAPI.removeContentListeners();
-                }
                 if (window.electronAPI.removeSyncListeners) {
                     window.electronAPI.removeSyncListeners();
                 }
@@ -304,11 +296,6 @@ function App() {
                     setSelectedTask(null);
                 } else if (showSettings) {
                     setShowSettings(false);
-                } else if (contentViewOpen) {
-                    if (window.electronAPI && window.electronAPI.closeContent) {
-                        window.electronAPI.closeContent();
-                        setCurrentDoc(null);
-                    }
                 }
                 return;
             }
@@ -333,7 +320,7 @@ function App() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [contentViewOpen, showSettings, showProfileMenu, isTaskModalOpen, isAuthenticated, loading]);
+    }, [showSettings, showProfileMenu, isTaskModalOpen, isAuthenticated, loading]);
 
     const handleLogin = async () => {
         try {
@@ -407,18 +394,12 @@ function App() {
         );
     }
 
-    const handleViewContent = (url, type, docInfo = null) => {
-        if (window.electronAPI && window.electronAPI.viewContent) {
-            window.electronAPI.viewContent(url, type);
-            setCurrentDoc(docInfo); // Track doc for edit button
+    // Google's own pages open in the user's browser, where they are signed in.
+    const openGooglePage = (url) => {
+        if (window.electronAPI && window.electronAPI.openGooglePage) {
+            window.electronAPI.openGooglePage(url);
         } else {
-            window.open(url, '_blank');
-        }
-    };
-
-    const handleSwitchToEdit = () => {
-        if (currentDoc && window.electronAPI && window.electronAPI.switchToEdit) {
-            window.electronAPI.switchToEdit(currentDoc.id, currentDoc.type);
+            window.open(url, '_blank', 'noopener');
         }
     };
 
@@ -525,32 +506,6 @@ function App() {
         setProfile(null);
     };
 
-    const handleCloseContent = () => {
-        if (window.electronAPI && window.electronAPI.closeContent) {
-            window.electronAPI.closeContent();
-            setCurrentDoc(null);
-        }
-    };
-
-    // Helper to get document type from mimeType
-    const getDocType = (mimeType) => {
-        if (mimeType.includes('document')) return 'document';
-        if (mimeType.includes('spreadsheet')) return 'spreadsheet';
-        if (mimeType.includes('presentation')) return 'presentation';
-        return 'document';
-    };
-
-    // Helper to get preview URL
-    const getPreviewUrl = (id, mimeType) => {
-        const type = getDocType(mimeType);
-        const urls = {
-            'document': `https://docs.google.com/document/d/${id}/preview`,
-            'spreadsheet': `https://docs.google.com/spreadsheets/d/${id}/preview`,
-            'presentation': `https://docs.google.com/presentation/d/${id}/preview`
-        };
-        return urls[type];
-    };
-
     // Helper to get doc icon
     const getDocIcon = (mimeType) => {
         if (mimeType.includes('spreadsheet')) return <FileSpreadsheet color="#34a853" size={16} />;
@@ -559,78 +514,7 @@ function App() {
     };
 
     return (
-        <div className="dashboard-container" style={contentViewOpen ? {
-            background: 'var(--bg-color)',
-            padding: 0,
-            minHeight: '100vh',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0
-        } : {}}>
-            {/* Header bar when content view is open */}
-            {contentViewOpen && (
-                <header style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    zIndex: 10000,
-                    background: 'var(--bg-color)',
-                    padding: '12px 24px',
-                    height: '80px',
-                    boxSizing: 'border-box',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    alignItems: 'center',
-                    gap: 12
-                }}>
-                    {currentDoc && (
-                        <div
-                            style={{
-                                background: 'var(--accent-brand)',
-                                color: 'var(--text-on-accent)',
-                                padding: '10px 20px',
-                                borderRadius: 0,
-                                cursor: 'pointer',
-                                fontFamily: 'ui-monospace, "SF Mono", monospace',
-                                fontSize: '0.75rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.1em',
-                                fontWeight: 500,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8
-                            }}
-                            onClick={handleSwitchToEdit}
-                        >
-                            Edit
-                        </div>
-                    )}
-                    <div
-                        style={{
-                            background: 'var(--btn-primary-bg)',
-                            color: 'var(--btn-primary-text)',
-                            padding: '10px 20px',
-                            borderRadius: 0,
-                            cursor: 'pointer',
-                            fontFamily: 'ui-monospace, "SF Mono", monospace',
-                            fontSize: '0.75rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.1em',
-                            fontWeight: 500,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8
-                        }}
-                        onClick={handleCloseContent}
-                    >
-                        Back to Dashboard
-                    </div>
-                </header>
-            )}
-            {!contentViewOpen && (
+        <div className="dashboard-container">
                 <header className="header">
                     <div className="header-content">
                         <h1>
@@ -751,9 +635,7 @@ function App() {
                         </div>
                     )}
                 </header>
-            )}
 
-            {!contentViewOpen && (
                 <div className="grid">
                     {/* Main Content Area (9 Columns) */}
                     <div className="col-span-9">
@@ -784,7 +666,7 @@ function App() {
                                                 <div
                                                     key={email.id}
                                                     className="list-item"
-                                                    onClick={() => handleViewContent(`https://mail.google.com/mail/u/0/#inbox/${email.id}`, 'email')}
+                                                    onClick={() => openGooglePage(gmailUrl(email))}
                                                 >
                                                     <div className="list-content">
                                                         <div className="item-title" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: email.unread ? 700 : 600 }}>
@@ -820,7 +702,7 @@ function App() {
                                     <div className="card-header">
                                         <div
                                             className="card-title"
-                                            onClick={() => handleViewContent('https://tasks.google.com/', 'tasks')}
+                                            onClick={() => openGooglePage('https://tasks.google.com/')}
                                             style={{ cursor: 'pointer' }}
                                             title="Open Google Tasks"
                                         >
@@ -951,7 +833,7 @@ function App() {
                                                 <div
                                                     key={meeting.id}
                                                     className="list-item"
-                                                    onClick={() => handleViewContent(meeting.meetLink, 'meet')}
+                                                    onClick={() => openGooglePage(meeting.meetLink)}
                                                 >
                                                     <div className="list-content">
                                                         <div className="item-title">{meeting.summary}</div>
@@ -1002,16 +884,12 @@ function App() {
                                                     key={doc.id}
                                                     className="doc-card"
                                                     data-tooltip={doc.name}
-                                                    onClick={() => handleViewContent(
-                                                        getPreviewUrl(doc.id, doc.mimeType),
-                                                        'document',
-                                                        { id: doc.id, type: getDocType(doc.mimeType) }
-                                                    )}
+                                                    onClick={() => openGooglePage(docUrl(doc.id, doc.mimeType))}
                                                 >
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                         {getDocIcon(doc.mimeType)}
                                                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'ui-monospace', textTransform: 'uppercase' }}>
-                                                            {getDocType(doc.mimeType)}
+                                                            {docType(doc.mimeType)}
                                                         </span>
                                                     </div>
                                                     <div className="item-title-truncate">{doc.name}</div>
@@ -1061,7 +939,7 @@ function App() {
                                                     className="file-card"
                                                     data-tooltip={file.name}
                                                     style={{ cursor: 'pointer' }}
-                                                    onClick={() => handleViewContent(file.webViewLink, 'file')}
+                                                    onClick={() => openGooglePage(file.webViewLink)}
                                                 >
                                                     <div style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: 8, overflow: 'hidden', width: '100%', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{file.name}</div>
                                                     {file.thumbnailLink ? (
@@ -1097,7 +975,6 @@ function App() {
                         </motion.div>
                     </div>
                 </div>
-            )}
 
             {/* Task Detail Modal */}
             <TaskDetailModal
