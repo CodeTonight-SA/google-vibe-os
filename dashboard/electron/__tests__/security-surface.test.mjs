@@ -59,3 +59,31 @@ describe('sign-in surface', () => {
     expect(logout.indexOf('unlink(')).toBeGreaterThan(revoke)
   })
 })
+
+// Google's own pages open in the user's browser (google-links.js). These fail
+// if the app goes back to showing them in a view of its own, which has no
+// Google session since sign-in moved to the browser, so Google asks for the
+// password inside the app.
+describe('Google pages open in the browser', () => {
+  it('main.js shows no Google page inside the app', () => {
+    expect(mainSrc).not.toMatch(/BrowserView|WebContentsView|webviewTag/)
+  })
+
+  it('open-google-page checks the address before the browser opens it', () => {
+    const start = mainSrc.indexOf("safeHandle('open-google-page'")
+    expect(start).toBeGreaterThan(-1)
+    const handler = mainSrc.slice(start, mainSrc.indexOf('safeHandle(', start + 1))
+    const check = handler.indexOf('googlePageUrl(')
+    expect(check).toBeGreaterThan(-1)
+    expect(handler.indexOf('shell.openExternal(target)')).toBeGreaterThan(check)
+  })
+
+  it('preload offers openGooglePage and nothing of the old in-app viewer', () => {
+    expect(/invoke\(\s*['"]open-google-page['"]/.test(preloadSrc)).toBe(true)
+    expect(preloadSrc).not.toMatch(/view-content|switch-to-edit|close-content|content-view-/)
+  })
+
+  it('the dashboard grants no camera or microphone', () => {
+    expect(mainSrc).not.toMatch(/['"]media['"]|['"]mediaKeySystem['"]/)
+  })
+})

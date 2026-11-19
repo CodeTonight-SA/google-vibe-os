@@ -47,6 +47,10 @@ app, or move `~/.googol-vibe/tokens/token_electron.json` aside.
 9. Optional, it takes 5 minutes: click Connect and close the browser tab
    without answering. Check that the app reports that sign-in timed out and
    that Connect works again.
+10. Click a mail, a document, a file, an upcoming meeting and the Tasks
+    title. Check that each opens in your default browser, signed in to the
+    account that the app shows, and that the app never shows a Google sign-in
+    page itself.
 
 Notes for each platform:
 
