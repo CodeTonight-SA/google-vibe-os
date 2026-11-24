@@ -759,30 +759,20 @@
             </div>
         </section>
 
-        <section class="vibe-ai" id="vibe-ai">
+        <section class="vibe-ai" id="beta">
             <div class="container">
                 <div class="vibe-ai-inner">
                     <div class="vibe-ai-content">
                         <h2>
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.5"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M5 19l.5 1.5L7 21l-1.5.5L5 23l-.5-1.5L3 21l1.5-.5L5 19z"/><path d="M19 13l.5 1.5L21 15l-1.5.5-.5 1.5-.5-1.5L17 15l1.5-.5.5-1.5z"/></svg>
-                            Vibe AI
-                            <span class="vibe-ai-badge">COMING SOON</span>
+                            Join the beta
                         </h2>
-                        <p>AI-powered automation for your Google Workspace. Natural language commands to manage email, calendar, and files.</p>
-                        <ul class="vibe-ai-features">
-                            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> "Summarise my unread emails"</li>
-                            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> "Schedule a meeting with the team next Tuesday"</li>
-                            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> "Find all invoices from last month"</li>
-                            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> "Draft a reply to the latest client email"</li>
-                        </ul>
+                        <p>Googol Vibe is in a private beta. Leave your name and email, and we will send you an invitation with the download and the sign-in steps.</p>
+                        <p>During the beta, Google shows an 'unverified app' screen when you sign in, and you sign in again every 7 days.</p>
                     </div>
                     <div class="waitlist-form-container" id="waitlist-form-container">
                         <div id="waitlist-form-view">
-                            <h3>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                Join the Waitlist
-                            </h3>
-                            <form class="waitlist-form" id="waitlist-form">
+                            <form class="waitlist-form" id="beta-form">
                                 <div class="form-group">
                                     <label for="name">Name</label>
                                     <input type="text" id="name" name="name" placeholder="Your name" required>
@@ -792,21 +782,20 @@
                                     <input type="email" id="email" name="email" placeholder="you@company.com" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="useCase">What would you use Vibe AI for?</label>
-                                    <textarea id="useCase" name="useCase" placeholder="e.g., Automate email triage, schedule meetings..." required></textarea>
+                                    <label for="useCase">Use case (optional)</label>
+                                    <textarea id="useCase" name="useCase" placeholder="What would you use it for? (optional)"></textarea>
                                 </div>
                                 <button type="submit" class="btn-waitlist" id="waitlist-btn">
-                                    <span id="btn-text">Join Waitlist</span>
+                                    <span id="btn-text">Join the beta</span>
                                     <svg id="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                                     <svg id="btn-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg>
                                 </button>
                             </form>
-                            <p class="waitlist-footer-text">No spam. Unsubscribe anytime.</p>
+                            <p class="waitlist-footer-text">We use your email only to send your beta invitation. See our <a href="privacy.html" style="color: var(--accent);">Privacy Policy</a>.</p>
                         </div>
                         <div id="waitlist-success-view" class="waitlist-success" style="display:none">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>
-                            <h3>You're on the list!</h3>
-                            <p>We'll notify you when Vibe AI launches.</p>
+                            <h3>Thank you. We will email your invitation.</h3>
                         </div>
                     </div>
                 </div>
@@ -841,7 +830,8 @@
     </footer>
 
     <script>
-    document.getElementById('waitlist-form').addEventListener('submit', async (e) => {
+    const BETA_FORM_ENDPOINT = 'https://formspree.io/f/maqywgvl';
+    document.getElementById('beta-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('waitlist-btn');
         const btnText = document.getElementById('btn-text');
@@ -855,9 +845,9 @@
 
         try {
             const formData = new FormData(e.target);
-            formData.append('_subject', 'Vibe AI Waitlist (Website)');
+            formData.append('_subject', 'Googol Vibe beta (Website)');
 
-            const response = await fetch('https://formspree.io/f/maqywgvl', {
+            const response = await fetch(BETA_FORM_ENDPOINT, {
                 method: 'POST',
                 body: formData,
                 headers: { 'Accept': 'application/json' }
