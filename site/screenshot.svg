@@ -38,19 +38,19 @@
   <text x="308" y="187" text-anchor="middle" font-family="system-ui" font-size="10" fill="#fff" font-weight="500">10 NEW</text>
 
   <!-- Email items -->
-  <text x="48" y="224" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Discord</text>
+  <text x="48" y="224" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Jane Example</text>
   <text x="300" y="224" text-anchor="end" font-family="system-ui" font-size="11" fill="#9ca3af">14:19</text>
-  <text x="48" y="242" font-family="system-ui" font-size="12" fill="#9ca3af">Discord Payment Success</text>
+  <text x="48" y="242" font-family="system-ui" font-size="12" fill="#9ca3af">Draft plan for Q1</text>
   <line x1="48" y1="256" x2="336" y2="256" stroke="#f3f4f6"/>
 
-  <text x="48" y="276" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Cole</text>
+  <text x="48" y="276" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Acme</text>
   <text x="300" y="276" text-anchor="end" font-family="system-ui" font-size="11" fill="#9ca3af">11:17</text>
-  <text x="48" y="294" font-family="system-ui" font-size="12" fill="#9ca3af">Wow Your Visitors With Formspree</text>
+  <text x="48" y="294" font-family="system-ui" font-size="12" fill="#9ca3af">News from example.com</text>
   <line x1="48" y1="308" x2="336" y2="308" stroke="#f3f4f6"/>
 
-  <text x="48" y="328" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">TLDR</text>
+  <text x="48" y="328" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="600">Sam</text>
   <text x="300" y="328" text-anchor="end" font-family="system-ui" font-size="11" fill="#9ca3af">13:48</text>
-  <text x="48" y="346" font-family="system-ui" font-size="12" fill="#9ca3af">Gmail address changes, ChatGPT...</text>
+  <text x="48" y="346" font-family="system-ui" font-size="12" fill="#9ca3af">Lunch on Friday?</text>
 
   <!-- TASKS Widget -->
   <rect x="368" y="160" width="280" height="200" rx="8" fill="#fff" stroke="#e5e7eb"/>
@@ -68,7 +68,7 @@
   <!-- Task item -->
   <rect x="384" y="260" width="4" height="40" rx="2" fill="#ea580c"/>
   <circle cx="404" cy="280" r="8" fill="none" stroke="#e5e7eb" stroke-width="1.5"/>
-  <text x="424" y="276" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Daily TODO</text>
+  <text x="424" y="276" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Read beta notes</text>
   <text x="424" y="294" font-family="system-ui" font-size="11" fill="#9ca3af">26/12/2025</text>
 
   <!-- VIBE TERMINAL -->
@@ -100,10 +100,10 @@
   <rect x="48" y="392" width="16" height="14" rx="2" fill="none" stroke="#6b7280" stroke-width="1.5"/>
   <text x="72" y="404" font-family="system-ui" font-size="12" fill="#1a1a1a" font-weight="600" letter-spacing="0.03em">UP NEXT</text>
 
-  <text x="48" y="440" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Office</text>
+  <text x="48" y="440" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Focus</text>
   <text x="48" y="458" font-family="system-ui" font-size="11" fill="#9ca3af">Fri 02:00</text>
   <line x1="48" y1="472" x2="336" y2="472" stroke="#f3f4f6"/>
-  <text x="48" y="492" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Daily Development Session</text>
+  <text x="48" y="492" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Design review</text>
   <text x="48" y="510" font-family="system-ui" font-size="11" fill="#9ca3af">Fri 16:30</text>
 
   <!-- MEETINGS Widget -->
@@ -113,10 +113,10 @@
   <rect x="548" y="388" width="84" height="22" rx="4" fill="#1a1a1a"/>
   <text x="590" y="403" text-anchor="middle" font-family="system-ui" font-size="10" fill="#fff" font-weight="500">7 THIS WEEK</text>
 
-  <text x="384" y="440" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Daily Development &amp; Design</text>
+  <text x="384" y="440" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Team sync</text>
   <text x="384" y="458" font-family="system-ui" font-size="11" fill="#9ca3af">Fri 16:30 (6 attendees)</text>
   <line x1="384" y1="472" x2="632" y2="472" stroke="#f3f4f6"/>
-  <text x="384" y="492" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Standup</text>
+  <text x="384" y="492" font-family="system-ui" font-size="13" fill="#1a1a1a" font-weight="500">Planning</text>
   <text x="384" y="510" font-family="system-ui" font-size="11" fill="#9ca3af">Mon 09:30 (6 attendees)</text>
 
   <!-- DOCUMENTS Widget -->
