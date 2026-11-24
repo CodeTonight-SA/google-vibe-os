@@ -29,54 +29,58 @@
     <div class="container">
         <a href="/" class="back">&larr; Back to Googol Vibe</a>
         <h1>Privacy Policy</h1>
-        <p class="updated">Last updated: 26 December 2025</p>
+        <p class="updated">Last updated: 24 November 2026</p>
 
         <h2>Summary</h2>
-        <p><strong>Your data stays on your device.</strong> Googol Vibe is a local-first application that connects directly to Google's APIs using your own credentials. We do not collect, store, or transmit your personal data.</p>
+        <p>Googol Vibe runs on your Mac and talks to Google directly. CodeTonight runs no server that receives your Google data, and never receives your sign-in tokens.</p>
 
-        <h2>What We Don't Collect</h2>
+        <h2>How you sign in</h2>
+        <p>During the beta you sign in through Googol Vibe's own Google sign-in client, which CodeTonight owns. If you build the app yourself, you can use your own Google Cloud project instead. Either way, your data goes directly between your Mac and Google.</p>
+
+        <h2>What the app can access</h2>
         <ul>
-            <li>Your emails, calendar events, files, or tasks</li>
-            <li>Your Google account credentials</li>
-            <li>Usage analytics or telemetry</li>
-            <li>IP addresses or device identifiers</li>
+            <li>Your name, email address and profile picture, to show who is signed in.</li>
+            <li>Gmail, Google Calendar and Google Drive: read-only.</li>
+            <li>Google Tasks: read and write, because the app lets you create, edit, complete and delete tasks.</li>
         </ul>
 
-        <h2>How It Works</h2>
-        <p>Googol Vibe connects to Google Workspace APIs using OAuth 2.0 credentials that you create in your own Google Cloud project. This means:</p>
+        <h2>Where your data is kept</h2>
+        <p>The app fetches your Google data from Google straight to your Mac; it is not sent to CodeTonight.</p>
+        <p>Your sign-in token is stored on your Mac in <code>~/.googol-vibe/tokens/</code>, encrypted with the macOS keychain when it is available.</p>
+        <p>Other files on your Mac:</p>
         <ul>
-            <li>You control the OAuth application</li>
-            <li>Tokens are stored locally in <code>~/.googol-vibe/</code></li>
-            <li>All API calls go directly from your device to Google</li>
-            <li>No data passes through our servers</li>
+            <li><code>~/.googol-vibe/credentials.json</code>: the Google sign-in client.</li>
+            <li><code>~/.googol-vibe/config.json</code>: settings.</li>
+            <li><code>~/.googol-vibe/recurrence.json</code>: your recurring-task rules.</li>
+            <li>In <code>~/Library/Application Support/googol-vibe/</code>: <code>ai-sessions.json</code> (your AI assistant chat history) and <code>anthropic-key.enc</code> (your Anthropic API key, encrypted).</li>
         </ul>
 
-        <h2>Optional Telemetry</h2>
-        <p>Googol Vibe includes optional, disabled-by-default telemetry for crash reporting. If you choose to enable it, we collect only:</p>
-        <ul>
-            <li>Error stack traces (no personal data)</li>
-            <li>Application version</li>
-            <li>Operating system type</li>
-        </ul>
-        <p>This data is processed by Sentry and used solely to fix bugs.</p>
+        <h2>The optional AI assistant</h2>
+        <p>The AI assistant is off until you add your own Anthropic API key. When you ask it something, your message and the Google data it fetches to answer (for example email text, calendar events, Drive file names and tasks) are sent to Anthropic's API under your own key, and Anthropic's terms apply to that data. The assistant asks you to confirm before it creates a task. CodeTonight does not receive this data.</p>
 
-        <h2>Third-Party Services</h2>
-        <p>When you use Googol Vibe, you interact with:</p>
-        <ul>
-            <li><strong>Google APIs</strong> - Subject to <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a></li>
-            <li><strong>Sentry</strong> (if telemetry enabled) - Subject to <a href="https://sentry.io/privacy/" target="_blank">Sentry's Privacy Policy</a></li>
-        </ul>
+        <h2>Error reports</h2>
+        <p>Error reports are off by default. They are sent to Sentry only when the build you use includes a Sentry address and you turn error reporting on in Settings. A report contains the error details, the app version and the operating system; the app removes email addresses, user names and network details before it sends one.</p>
 
-        <h2>Data Storage</h2>
-        <p>All application data is stored locally:</p>
+        <h2>Google API Services User Data Policy</h2>
+        <p>The use of information received from Google Workspace scopes will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google User Data Policy</a>, including the Limited Use requirements.</p>
         <ul>
-            <li><code>~/.googol-vibe/credentials.json</code> - Your OAuth client configuration</li>
-            <li><code>~/.googol-vibe/tokens/</code> - OAuth refresh tokens</li>
-            <li><code>~/.googol-vibe/config.json</code> - Application settings</li>
+            <li>We use your Google data only to provide the features you see in the app.</li>
+            <li>We do not sell it, transfer it to advertising platforms or data brokers, or use it for advertising.</li>
+            <li>We do not use it to decide credit-worthiness or for lending.</li>
+            <li>We do not use it to create, train or improve artificial intelligence or machine learning models.</li>
+            <li>No person at CodeTonight reads your Google data.</li>
         </ul>
 
-        <h2>Your Rights</h2>
-        <p>Since we don't collect your data, there's nothing to delete. To remove all local data, simply delete the <code>~/.googol-vibe/</code> folder and uninstall the application.</p>
+        <h2>The website and the beta sign-up</h2>
+        <p>This website runs no analytics and sets no cookies. When you join the beta, on this website or in the app, the name and email address you type, and anything you write in the optional box, are sent to Formspree, a form service, which passes them to CodeTonight. We use them only to send your beta invitation, and we delete them when you ask.</p>
+
+        <h2>Your choices</h2>
+        <ul>
+            <li>Sign out in the app: this asks Google to end the app's access and deletes the token from your Mac.</li>
+            <li>You can also remove the app's access at any time at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">https://myaccount.google.com/permissions</a>.</li>
+            <li>To delete everything the app keeps on your Mac, quit it and delete <code>~/.googol-vibe/</code> and <code>~/Library/Application Support/googol-vibe/</code>.</li>
+            <li>To have your beta sign-up deleted, email us at the contact address below.</li>
+        </ul>
 
         <h2>Contact</h2>
         <p>For privacy questions, contact us at <a href="mailto:laurie@codetonight.co.za">laurie@codetonight.co.za</a>.</p>
