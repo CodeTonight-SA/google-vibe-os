@@ -10,6 +10,7 @@ const os = require('os');
 const fs = require('fs');
 const { app } = require('electron');
 const log = require('./logger');
+const { writePrivateFile, writePrivateFileSync, tightenExistingSync } = require('./private-file');
 
 // App constants
 const APP_NAME = 'googol-vibe';
@@ -30,10 +31,24 @@ class ConfigManager {
 
         this.configDir = this._resolveConfigDir();
         this._ensureDirectories();
+        this._tightenPrivateFiles();
         this.config = this._loadConfig();
         this._initialized = true;
 
         log.info(`[ConfigManager] Initialized: ${this.configDir}`);
+    }
+
+    /**
+     * Tighten the private files an older version may have left readable (0644).
+     * Every later write keeps them owner-only; this covers a file not written again.
+     */
+    _tightenPrivateFiles() {
+        tightenExistingSync([
+            path.join(this.configDir, 'credentials.json'),
+            path.join(this.configDir, 'config.json'),
+            path.join(this.configDir, 'recurrence.json'),
+            this.getTokenPath(),
+        ]);
     }
 
     /**
@@ -69,7 +84,8 @@ class ConfigManager {
 
         for (const dir of dirs) {
             if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
+                // New folders are this user's only; an existing folder is left as it is.
+                fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
             }
         }
     }
@@ -115,7 +131,7 @@ class ConfigManager {
      */
     saveConfig() {
         const configPath = path.join(this.configDir, 'config.json');
-        fs.writeFileSync(configPath, JSON.stringify(this.config, null, 2));
+        writePrivateFileSync(configPath, JSON.stringify(this.config, null, 2));
     }
 
     /**
@@ -288,9 +304,9 @@ class ConfigManager {
             throw new Error('Invalid credentials file: missing client_id');
         }
 
-        // Copy to config directory
+        // Copy to config directory, readable by this user only: the file holds the client secret.
         const destPath = path.join(this.configDir, 'credentials.json');
-        await fs.promises.writeFile(destPath, content);
+        await writePrivateFile(destPath, content);
 
         log.info(`[ConfigManager] Credentials imported to: ${destPath}`);
         return destPath;
@@ -311,7 +327,7 @@ class ConfigManager {
         // Migrate legacy token
         if (fs.existsSync(legacyTokenPath)) {
             const content = await fs.promises.readFile(legacyTokenPath);
-            await fs.promises.writeFile(newTokenPath, content);
+            await writePrivateFile(newTokenPath, content);
             log.info(`[ConfigManager] Token migrated to: ${newTokenPath}`);
             return true;
         }
