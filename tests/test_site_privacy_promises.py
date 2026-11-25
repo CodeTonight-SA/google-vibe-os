@@ -25,24 +25,32 @@ PRIVACY_PROMISES = [
     "No person at CodeTonight reads your Google data",
 ]
 
-# A sentence contradicts the promises when it names CodeTonight (or "our
-# servers"), the user's data, and a verb that moves or keeps it, with no
-# negation. It is judged per sentence, so a contradiction is found whatever
-# its wording (AGORA's first sitting on #43 showed a fixed phrase list missing
-# "uploaded to CodeTonight" and flagging "never sent to CodeTonight").
+# A tripwire for the common wordings, not a proof. A statement (not a
+# question) that mentions the user's data contradicts the promises when one of
+# its clauses names CodeTonight (or "our servers") and a verb that moves, keeps
+# or reads the data, with no negation in that clause. Clauses are judged one by
+# one, so "not sold to advertisers, but uploaded to CodeTonight" is still found
+# (AGORA's sittings on #43 found each of these wordings).
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+_CLAUSE_BREAK = re.compile(r"(?i)[;:]|,?\s+\b(?:but|and|while|whereas|however|although)\b")
 _WHO = re.compile(r"(?i)\bCodeTonight\b|\bour servers?\b")
 _WHAT = re.compile(r"(?i)\b(?:data|Gmail|mail|messages|calendar|Drive|files|tokens?)\b")
 _MOVES = re.compile(
     r"(?i)\b(?:receiv\w*|stor(?:e|es|ed|ing)|collect\w*|upload\w*|sen(?:d|ds|t|ding)"
-    r"|keeps?|kept|cop(?:y|ies|ied))\b")
+    r"|keeps?|kept|cop(?:y|ies|ied)|reads?|sees?|seen|views?|access\w*|process\w*"
+    r"|shar(?:e|es|ed|ing))\b")
 _NEGATION = re.compile(r"(?i)\b(?:not|no|never|nothing|none|neither|nor|without)\b|n['’]t\b")
 
 
+def _admits(clause: str) -> bool:
+    return bool(_WHO.search(clause) and _MOVES.search(clause) and not _NEGATION.search(clause))
+
+
 def contradictions(text: str) -> list:
-    """Sentences that say CodeTonight receives, keeps or moves the user's data."""
+    """Statements that say CodeTonight receives, keeps or reads the user's data."""
     return [s for s in _SENTENCE_END.split(text)
-            if _WHO.search(s) and _WHAT.search(s) and _MOVES.search(s) and not _NEGATION.search(s)]
+            if not s.rstrip().endswith("?") and _WHAT.search(s)
+            and any(_admits(clause) for clause in _CLAUSE_BREAK.split(s))]
 
 
 def test_the_privacy_page_keeps_every_promise():
@@ -67,6 +75,8 @@ def test_the_check_catches_a_contradiction_in_any_wording():
         "CodeTonight receives the data.",
         "CodeTonight’s servers store your Gmail messages.",
         "Your data is sent to CodeTonight for processing.",
+        "Your data is not sold to advertisers, but it is uploaded to CodeTonight.",
+        "CodeTonight reads your mail to rank it.",
     ):
         assert contradictions(claim), claim
 
@@ -78,5 +88,7 @@ def test_the_check_leaves_a_denial_alone():
         "No data is sent to CodeTonight.",
         "CodeTonight runs no server that receives your Google data.",
         "CodeTonight doesn’t store your mail.",
+        "Is my data sent to CodeTonight? No.",
+        "No person at CodeTonight reads your Google data.",
     ):
         assert not contradictions(denial), denial
