@@ -78,3 +78,14 @@ describe('fetchInbox', () => {
     expect(log.error).toHaveBeenCalled()
   })
 })
+
+describe('one conversation read per conversation', () => {
+  it('reads a conversation once, however many of its messages the inbox lists', async () => {
+    const shared = { threadId: 't-shared' }
+    const gmail = fakeGmail([person('m1', 3, shared), person('m2', 4, shared), person('m3', 5, shared)])
+    const items = await fetchInbox(gmail, 10, makeLog(), NOW)
+    expect(items).toHaveLength(3)
+    expect(gmail.users.threads.get).toHaveBeenCalledTimes(1)
+    expect(items.every(i => i.advice === 'follow-up')).toBe(true)
+  })
+})

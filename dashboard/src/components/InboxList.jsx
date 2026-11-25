@@ -1,7 +1,5 @@
-import { formatWhen } from '../mail-age';
+import { formatWhen, senderName } from '../mail-age';
 import MailAgeLine from './MailAgeLine';
-
-const senderName = (from) => from.split('<')[0].replace(/"/g, '');
 
 /** The inbox rows: who sent it, when it arrived, the subject, and its age and advice. */
 export default function InboxList({ emails, onOpen }) {
