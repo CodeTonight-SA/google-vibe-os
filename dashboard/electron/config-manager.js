@@ -10,7 +10,7 @@ const os = require('os');
 const fs = require('fs');
 const { app } = require('electron');
 const log = require('./logger');
-const { writePrivateFile, writePrivateFileSync } = require('./private-file');
+const { writePrivateFile, writePrivateFileSync, tightenExistingSync } = require('./private-file');
 
 // App constants
 const APP_NAME = 'googol-vibe';
@@ -31,10 +31,24 @@ class ConfigManager {
 
         this.configDir = this._resolveConfigDir();
         this._ensureDirectories();
+        this._tightenPrivateFiles();
         this.config = this._loadConfig();
         this._initialized = true;
 
         log.info(`[ConfigManager] Initialized: ${this.configDir}`);
+    }
+
+    /**
+     * Tighten the private files an older version may have left readable (0644).
+     * Every later write keeps them owner-only; this covers a file not written again.
+     */
+    _tightenPrivateFiles() {
+        tightenExistingSync([
+            path.join(this.configDir, 'credentials.json'),
+            path.join(this.configDir, 'config.json'),
+            path.join(this.configDir, 'recurrence.json'),
+            this.getTokenPath(),
+        ]);
     }
 
     /**

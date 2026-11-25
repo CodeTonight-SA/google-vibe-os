@@ -77,4 +77,13 @@ describe('the other private files the config manager writes', () => {
     configManager.saveConfig()
     expect(modeOf(path.join(dir, 'config.json'))).toBe(0o600)
   })
+
+  it.skipIf(!POSIX)('tightens a client file an older version left open, at start, before any write', async () => {
+    const dir = path.join(tmpDir, 'upgraded')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'credentials.json'), CLIENT, { mode: 0o644 })
+    fs.chmodSync(path.join(dir, 'credentials.json'), 0o644)
+    await loadConfigManager(dir)
+    expect(modeOf(path.join(dir, 'credentials.json'))).toBe(0o600)
+  })
 })

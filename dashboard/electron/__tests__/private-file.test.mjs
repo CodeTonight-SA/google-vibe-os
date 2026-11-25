@@ -12,7 +12,7 @@ import fs from 'fs'
 import { electronMock } from './setup.mjs'
 
 const require = createRequire(import.meta.url)
-const { writePrivateFile, writePrivateFileSync } = require('../private-file.js')
+const { writePrivateFile, writePrivateFileSync, tightenExistingSync } = require('../private-file.js')
 
 const POSIX = process.platform !== 'win32'
 const modeOf = (p) => fs.statSync(p).mode & 0o777
@@ -82,5 +82,29 @@ describe('the token store', () => {
   it.skipIf(!POSIX)('tightens a token file an older version left at 0644, encrypted or not', () => {
     expect(saveWith(true)).toBe(0o600)
     expect(saveWith(false)).toBe(0o600)
+  })
+})
+
+describe('tightening is best effort, so a save that worked never starts failing', () => {
+  const refused = (code) => Object.assign(new Error('refused'), { code })
+
+  it('still writes when the disk refuses the chmod (asynchronous)', async () => {
+    const p = path.join(tmpDir, 'fat.json')
+    vi.spyOn(fs.promises, 'chmod').mockRejectedValue(refused('EPERM'))
+    await writePrivateFile(p, 'kept')
+    expect(fs.readFileSync(p, 'utf8')).toBe('kept')
+  })
+
+  it('still writes when the disk refuses the chmod (synchronous)', () => {
+    const p = path.join(tmpDir, 'smb.json')
+    vi.spyOn(fs, 'chmodSync').mockImplementation(() => { throw refused('ENOTSUP') })
+    writePrivateFileSync(p, 'kept')
+    expect(fs.readFileSync(p, 'utf8')).toBe('kept')
+  })
+
+  it.skipIf(!POSIX)('tightens existing files at start and skips missing ones', () => {
+    const loose = looseFile('config.json')
+    tightenExistingSync([loose, path.join(tmpDir, 'missing.json')])
+    expect(modeOf(loose)).toBe(0o600)
   })
 })
