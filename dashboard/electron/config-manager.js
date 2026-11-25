@@ -15,6 +15,21 @@ const log = require('./logger');
 const APP_NAME = 'googol-vibe';
 const LEGACY_SECRETS_PATH = '.agent/secrets';
 
+// The client file, the token and the settings stay readable by this user only.
+// writeFile's mode applies only when it creates a file, so the chmod also
+// tightens a file that an older version left at 0644.
+const PRIVATE_FILE_MODE = 0o600;
+
+async function writePrivateFile(filePath, content) {
+    await fs.promises.writeFile(filePath, content, { mode: PRIVATE_FILE_MODE });
+    await fs.promises.chmod(filePath, PRIVATE_FILE_MODE);
+}
+
+function writePrivateFileSync(filePath, content) {
+    fs.writeFileSync(filePath, content, { mode: PRIVATE_FILE_MODE });
+    fs.chmodSync(filePath, PRIVATE_FILE_MODE);
+}
+
 class ConfigManager {
     constructor() {
         this.configDir = null;
@@ -116,7 +131,7 @@ class ConfigManager {
      */
     saveConfig() {
         const configPath = path.join(this.configDir, 'config.json');
-        fs.writeFileSync(configPath, JSON.stringify(this.config, null, 2));
+        writePrivateFileSync(configPath, JSON.stringify(this.config, null, 2));
     }
 
     /**
@@ -289,12 +304,9 @@ class ConfigManager {
             throw new Error('Invalid credentials file: missing client_id');
         }
 
-        // Copy to config directory, readable by this user only: the file holds the
-        // client secret. writeFile's mode applies only when it creates the file,
-        // so chmod also tightens a file an older version left at 0644.
+        // Copy to config directory, readable by this user only: the file holds the client secret.
         const destPath = path.join(this.configDir, 'credentials.json');
-        await fs.promises.writeFile(destPath, content, { mode: 0o600 });
-        await fs.promises.chmod(destPath, 0o600);
+        await writePrivateFile(destPath, content);
 
         log.info(`[ConfigManager] Credentials imported to: ${destPath}`);
         return destPath;
@@ -315,7 +327,7 @@ class ConfigManager {
         // Migrate legacy token
         if (fs.existsSync(legacyTokenPath)) {
             const content = await fs.promises.readFile(legacyTokenPath);
-            await fs.promises.writeFile(newTokenPath, content);
+            await writePrivateFile(newTokenPath, content);
             log.info(`[ConfigManager] Token migrated to: ${newTokenPath}`);
             return true;
         }

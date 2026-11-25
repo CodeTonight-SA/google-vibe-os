@@ -60,3 +60,21 @@ describe('the imported client file and its folders', () => {
     expect(modeOf(path.join(dir, 'tokens'))).toBe(0o700)
   })
 })
+
+describe('the other private files the config manager writes', () => {
+  it.skipIf(!POSIX)('migrates a legacy token readable by its owner only', async () => {
+    await loadConfigManager(path.join(tmpDir, 'config'))
+    const legacy = configManager.getLegacyTokenPath()
+    fs.mkdirSync(path.dirname(legacy), { recursive: true })
+    fs.writeFileSync(legacy, '{"example":true}', { mode: 0o644 })
+    expect(await configManager.migrateTokenIfNeeded()).toBe(true)
+    expect(modeOf(configManager.getTokenPath())).toBe(0o600)
+  })
+
+  it.skipIf(!POSIX)('saves config.json readable by its owner only', async () => {
+    const dir = path.join(tmpDir, 'config')
+    await loadConfigManager(dir)
+    configManager.saveConfig()
+    expect(modeOf(path.join(dir, 'config.json'))).toBe(0o600)
+  })
+})
