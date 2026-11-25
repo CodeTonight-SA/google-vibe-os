@@ -104,6 +104,49 @@ describe('writePrivateFile and writePrivateFileSync', () => {
     expect(fs.readFileSync(real, 'utf8')).toBe('secret again')
     expect(modeOf(real)).toBe(0o600)
   })
+
+  it.skipIf(!POSIX)('keep a dangling symlink and create the file it points to', async () => {
+    const real = path.join(tmpDir, 'real.json')
+    const link = path.join(tmpDir, 'link.json')
+    fs.symlinkSync(real, link)
+    await writePrivateFile(link, 'secret')
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true)
+    expect(fs.readFileSync(real, 'utf8')).toBe('secret')
+    fs.unlinkSync(real)
+    writePrivateFileSync(link, 'again')
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true)
+    expect(fs.readFileSync(real, 'utf8')).toBe('again')
+  })
+})
+
+describe('a full disk leaves the old file whole and reports the error', () => {
+  // Only the temporary file fails, so a fallback to an in-place write would
+  // succeed and change the target, and the test would see it.
+  it.skipIf(!POSIX)('asynchronous', async () => {
+    const p = looseFile('g.json')
+    const realOpen = fs.promises.open
+    vi.spyOn(fs.promises, 'open').mockImplementation(async (file, ...rest) => {
+      if (String(file).endsWith('.tmp')) throw refused('ENOSPC')
+      return realOpen(file, ...rest)
+    })
+    await expect(writePrivateFile(p, 'secret')).rejects.toMatchObject({ code: 'ENOSPC' })
+    vi.restoreAllMocks()
+    expect(fs.readFileSync(p, 'utf8')).toBe('old')
+  })
+
+  it.skipIf(!POSIX)('synchronous', () => {
+    const p = looseFile('h.json')
+    const realOpenSync = fs.openSync
+    vi.spyOn(fs, 'openSync').mockImplementation((file, ...rest) => {
+      if (String(file).endsWith('.tmp')) throw refused('ENOSPC')
+      return realOpenSync(file, ...rest)
+    })
+    let code = null
+    try { writePrivateFileSync(p, 'secret') } catch (err) { code = err.code }
+    vi.restoreAllMocks()
+    expect(code).toBe('ENOSPC')
+    expect(fs.readFileSync(p, 'utf8')).toBe('old')
+  })
 })
 
 describe('when the rename is refused, the file is written in place, tightened first', () => {
@@ -113,6 +156,7 @@ describe('when the rename is refused, the file is written in place, tightened fi
     expect(inPlace).toHaveLength(1)
     expect(inPlace[0].before).toBe(0o600)
     expect(fs.readFileSync(p, 'utf8')).toBe('secret')
+    expect(modeOf(p)).toBe(0o600)
     expect(fs.readdirSync(tmpDir)).toEqual([path.basename(p)])
   }
 

@@ -10,16 +10,23 @@
  *
  * Where the rename is refused (another program holds the file on Windows, a
  * disk that will not do it), the file is written in place instead: tightened
- * first, then written. Tightening is best effort. A disk without Unix
+ * first, then written. A full disk, or another error an in-place write would
+ * only repeat after truncating the file, is raised with the old file whole. Tightening is best effort. A disk without Unix
  * permissions (FAT, exFAT, some network mounts) or a file owned by another
  * account refuses the chmod; the write still happens and a warning is logged,
  * so a save that worked before never starts failing.
  */
 const fs = require('fs');
+const path = require('path');
 const log = require('./logger');
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
+
+// A full disk, an exceeded quota, an I/O error or a read-only disk would make
+// an in-place write fail the same way after truncating the old file, so these
+// errors are raised and the old file is left whole.
+const KEEP_OLD_FILE = new Set(['ENOSPC', 'EDQUOT', 'EIO', 'EROFS']);
 
 let sequence = 0;
 
@@ -37,13 +44,23 @@ function tempPathFor(target) {
     return `${target}.${process.pid}.${sequence}.tmp`;
 }
 
+// The real file behind a symlink, even a dangling one, so the rename replaces
+// that file and the link stays a link. A plain path is its own target.
 async function realTarget(filePath) {
-    return fs.promises.realpath(filePath).catch(() => filePath);
+    const real = await fs.promises.realpath(filePath).catch(() => null);
+    if (real) return real;
+    const link = await fs.promises.readlink(filePath).catch(() => null);
+    return link ? path.resolve(path.dirname(filePath), link) : filePath;
 }
 
 function realTargetSync(filePath) {
     try {
         return fs.realpathSync(filePath);
+    } catch {
+        // A missing file, or a dangling symlink that readlink resolves below.
+    }
+    try {
+        return path.resolve(path.dirname(filePath), fs.readlinkSync(filePath));
     } catch {
         return filePath;
     }
@@ -80,6 +97,7 @@ async function writePrivateFile(filePath, content) {
         return;
     } catch (err) {
         await fs.promises.rm(temp, { force: true }).catch(() => {});
+        if (KEEP_OLD_FILE.has(err.code)) throw err;
         noteInPlace(target, err);
     }
     await fs.promises.chmod(target, PRIVATE_FILE_MODE).catch(err => noteTightenFailure(target, err));
@@ -112,6 +130,7 @@ function writePrivateFileSync(filePath, content) {
         return;
     } catch (err) {
         discardSync(temp);
+        if (KEEP_OLD_FILE.has(err.code)) throw err;
         noteInPlace(target, err);
     }
     tightenSync(target);
