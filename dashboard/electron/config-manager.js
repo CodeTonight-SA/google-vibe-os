@@ -10,7 +10,7 @@ const os = require('os');
 const fs = require('fs');
 const { app } = require('electron');
 const log = require('./logger');
-const { writePrivateFile, writePrivateFileSync, tightenExistingSync } = require('./private-file');
+const { PRIVATE_DIR_MODE, writePrivateFile, writePrivateFileSync, tightenExistingSync } = require('./private-file');
 
 // App constants
 const APP_NAME = 'googol-vibe';
@@ -49,6 +49,24 @@ class ConfigManager {
             this.getRecurrencePath(),
             this.getTokenPath(),
         ]);
+        tightenExistingSync(this._ownFolders(), PRIVATE_DIR_MODE);
+    }
+
+    /**
+     * The folders the app chose itself. A folder named in GOOGOL_VIBE_CONFIG_DIR
+     * or GOOGLE_TOKEN_DIR is the user's to manage, so start-up leaves its mode
+     * alone (a missing config folder is still created owner-only).
+     */
+    _ownFolders() {
+        const own = [];
+        if (!process.env.GOOGOL_VIBE_CONFIG_DIR) own.push(this.configDir);
+        if (!process.env.GOOGLE_TOKEN_DIR) own.push(this._tokensDir());
+        return own;
+    }
+
+    /** The app's own token folder, inside the config folder; the one place it is spelt out. */
+    _tokensDir() {
+        return path.join(this.configDir, 'tokens');
     }
 
     /** Where the recurring-task rules live; the one place this path is spelt out. */
@@ -84,12 +102,12 @@ class ConfigManager {
     _ensureDirectories() {
         const dirs = [
             this.configDir,
-            path.join(this.configDir, 'tokens')
+            this._tokensDir()
         ];
 
         for (const dir of dirs) {
             if (!fs.existsSync(dir)) {
-                // New folders are this user's only; an existing folder is left as it is.
+                // New folders are this user's only; an existing one the app chose is tightened at start.
                 fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
             }
         }
@@ -208,7 +226,7 @@ class ConfigManager {
         }
 
         // New unified location
-        return path.join(this.configDir, 'tokens', `token_${service}.json`);
+        return path.join(this._tokensDir(), `token_${service}.json`);
     }
 
     /**

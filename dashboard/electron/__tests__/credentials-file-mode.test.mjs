@@ -118,4 +118,15 @@ describe('the other private files the config manager writes', () => {
     await loadConfigManager(dir)
     expect(modeOf(path.join(dir, 'credentials.json'))).toBe(0o600)
   })
+
+  it.skipIf(!POSIX)('tightens the token folder the app chose, and leaves a folder the user named alone', async () => {
+    // GOOGOL_VIBE_CONFIG_DIR names `dir`, so the user chose it; `tokens` inside it is the app's.
+    const dir = path.join(tmpDir, 'named')
+    fs.mkdirSync(path.join(dir, 'tokens'), { recursive: true })
+    fs.chmodSync(dir, 0o755)
+    fs.chmodSync(path.join(dir, 'tokens'), 0o755)
+    await loadConfigManager(dir)
+    expect(modeOf(path.join(dir, 'tokens'))).toBe(0o700)
+    expect(modeOf(dir)).toBe(0o755)
+  })
 })
