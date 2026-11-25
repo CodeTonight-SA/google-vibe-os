@@ -9,6 +9,7 @@ const path = require('path');
 const { RRule } = require('rrule');
 const configManager = require('./config-manager');
 const log = require('./logger');
+const { writePrivateFileSync } = require('./private-file');
 
 // DoS / correctness bound for stored RRULE strings.
 const MAX_RRULE_LEN = 2048;
@@ -51,7 +52,7 @@ class RecurrenceManager {
     save() {
         try {
             const data = { rules: this.rules, updatedAt: new Date().toISOString() };
-            fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+            writePrivateFileSync(this.filePath, JSON.stringify(data, null, 2));
         } catch (e) {
             log.error('[RecurrenceManager] Failed to save rules:', e);
         }

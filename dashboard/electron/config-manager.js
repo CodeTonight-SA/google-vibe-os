@@ -10,25 +10,11 @@ const os = require('os');
 const fs = require('fs');
 const { app } = require('electron');
 const log = require('./logger');
+const { writePrivateFile, writePrivateFileSync } = require('./private-file');
 
 // App constants
 const APP_NAME = 'googol-vibe';
 const LEGACY_SECRETS_PATH = '.agent/secrets';
-
-// The client file, the token and the settings stay readable by this user only.
-// writeFile's mode applies only when it creates a file, so the chmod also
-// tightens a file that an older version left at 0644.
-const PRIVATE_FILE_MODE = 0o600;
-
-async function writePrivateFile(filePath, content) {
-    await fs.promises.writeFile(filePath, content, { mode: PRIVATE_FILE_MODE });
-    await fs.promises.chmod(filePath, PRIVATE_FILE_MODE);
-}
-
-function writePrivateFileSync(filePath, content) {
-    fs.writeFileSync(filePath, content, { mode: PRIVATE_FILE_MODE });
-    fs.chmodSync(filePath, PRIVATE_FILE_MODE);
-}
 
 class ConfigManager {
     constructor() {

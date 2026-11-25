@@ -1,6 +1,7 @@
 const { safeStorage } = require('electron');
 const fs = require('fs');
 const log = require('./logger');
+const { writePrivateFileSync } = require('./private-file');
 
 /**
  * Encrypted-at-rest storage for Google OAuth tokens.
@@ -17,10 +18,10 @@ const log = require('./logger');
 function saveToken(tokenPath, tokens) {
     const json = JSON.stringify(tokens);
     if (safeStorage.isEncryptionAvailable()) {
-        fs.writeFileSync(tokenPath, safeStorage.encryptString(json), { mode: 0o600 });
+        writePrivateFileSync(tokenPath, safeStorage.encryptString(json));
         log.info('[TokenStorage] OAuth token saved (encrypted)');
     } else {
-        fs.writeFileSync(tokenPath, json, { mode: 0o600 });
+        writePrivateFileSync(tokenPath, json);
         log.warn('[TokenStorage] OS keyring unavailable — token stored plaintext (0600)');
     }
 }
