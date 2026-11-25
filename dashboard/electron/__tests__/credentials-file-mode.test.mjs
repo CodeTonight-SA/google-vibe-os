@@ -45,11 +45,20 @@ afterEach(() => {
 })
 
 describe('the sandbox', () => {
-  // As if the developer's shell exported it: set before the shared setup runs.
-  beforeAll(() => { process.env.GOOGLE_TOKEN_DIR = path.join(os.tmpdir(), 'gv-outside-the-sandbox') })
-  afterAll(() => { delete process.env.GOOGLE_TOKEN_DIR })
+  // As if the developer's shell exported it: set before the shared setup runs,
+  // and put back afterwards. The shared beforeEach must clear it before each
+  // test, so this test fails if that isolation is removed.
+  let exported
+  beforeAll(() => {
+    exported = process.env.GOOGLE_TOKEN_DIR
+    process.env.GOOGLE_TOKEN_DIR = path.join(os.tmpdir(), 'gv-outside-the-sandbox')
+  })
+  afterAll(() => {
+    if (exported === undefined) delete process.env.GOOGLE_TOKEN_DIR
+    else process.env.GOOGLE_TOKEN_DIR = exported
+  })
 
-  it('ignores a token folder exported in the developer\'s shell', async () => {
+  it('clears a token folder the developer\'s shell exported, before each test', async () => {
     await loadConfigManager(path.join(tmpDir, 'config'))
     expect(configManager.getTokenPath().startsWith(path.join(tmpDir, 'config'))).toBe(true)
   })
