@@ -1,8 +1,11 @@
-"""The website's privacy promises stay true as the pages change.
+"""What the website says about CodeTonight and the user's data stays reviewed.
 
-A forward anchor (google-vibe-os#33, from the council's review of #32): it
-passes on today's pages and fails if an edit drops a promise that CodeTonight
-never receives the user's Google data, or adds a sentence saying that it does.
+Every sentence on the two pages that mentions CodeTonight (or "we", "us",
+"our") together with the user's data must match the reviewed list below, word
+for word. A new, changed or removed sentence fails the test until a person
+reads it and updates REVIEWED. This replaces a word-pattern tripwire that each
+review found a new way past (google-vibe-os#43, #45): a list does not have to
+guess what a sentence means.
 """
 
 import html
@@ -11,84 +14,70 @@ from pathlib import Path
 
 SITE = Path(__file__).resolve().parents[1] / "site"
 
-
-def _text(page: str) -> str:
-    raw = (SITE / page).read_text(encoding="utf-8")
-    raw = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
-    return re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", raw)))
-
-
-PRIVACY_PROMISES = [
-    "CodeTonight runs no server that receives your Google data",
-    "it is not sent to CodeTonight",
-    "CodeTonight does not receive this data",
-    "No person at CodeTonight reads your Google data",
-]
-
-# A tripwire for the common wordings, not a proof. A statement (not a
-# question) that mentions the user's data contradicts the promises when one of
-# its clauses names CodeTonight (or "our servers") and a verb that moves, keeps
-# or reads the data, with no negation in that clause. Clauses are judged one by
-# one, so "not sold to advertisers, but uploaded to CodeTonight" is still found
-# (AGORA's sittings on #43 found each of these wordings).
+_BLOCK_END = re.compile(
+    r"(?i)</(?:p|h[1-6]|li|div|section|header|footer|td|th|dt|dd|blockquote|summary|button|form|label)>"
+    r"|<br\s*/?>")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
-_CLAUSE_BREAK = re.compile(r"(?i)[;:]|,?\s+\b(?:but|and|while|whereas|however|although)\b")
-_WHO = re.compile(r"(?i)\bCodeTonight\b|\bour servers?\b")
-_WHAT = re.compile(r"(?i)\b(?:data|Gmail|mail|messages|calendar|Drive|files|tokens?)\b")
-_MOVES = re.compile(
-    r"(?i)\b(?:receiv\w*|stor(?:e|es|ed|ing)|collect\w*|upload\w*|sen(?:d|ds|t|ding)"
-    r"|keeps?|kept|cop(?:y|ies|ied)|reads?|sees?|seen|views?|access\w*|process\w*"
-    r"|shar(?:e|es|ed|ing))\b")
-_NEGATION = re.compile(r"(?i)\b(?:not|no|never|nothing|none|neither|nor|without)\b|n['’]t\b")
+_WHO = re.compile(r"(?i)\b(?:CodeTonight|we|us|our)\b")
+_WHAT = re.compile(r"(?i)\b(?:data|Gmail|mail|e-?mails?|messages|calendar|Drive|files|tokens?|information)\b")
+
+REVIEWED = {
+    "privacy.html": [
+        "CodeTonight runs no server that receives your Google data, and never receives your sign-in tokens.",
+        "The app fetches your Google data from Google straight to your Mac; it is not sent to CodeTonight.",
+        "CodeTonight does not receive this data.",
+        "We use your Google data only to provide the features you see in the app.",
+        "We do not sell it, transfer it to advertising platforms or data brokers, or use it for advertising.",
+        "No person at CodeTonight reads your Google data.",
+        "When you join the beta on this website, the name and email address you type, and anything you write "
+        "in the optional box, are sent to Formspree, a form service, which passes them to CodeTonight.",
+        "To have your beta sign-up deleted, email us at the contact address below.",
+    ],
+    "index.html": [
+        "No CodeTonight server sees your data.",
+        "Leave your name and email, and we will send you an invitation with the download and the sign-in steps.",
+        "We use your email only to send your beta invitation.",
+        "We will email your invitation.",
+    ],
+}
 
 
-def _admits(clause: str) -> bool:
-    return bool(_WHO.search(clause) and _MOVES.search(clause) and not _NEGATION.search(clause))
+def sentences(raw: str) -> list:
+    """The sentences of an HTML page; a block-level tag also ends a sentence."""
+    raw = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
+    text = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", _BLOCK_END.sub("\x00", raw))))
+    return [s.strip() for block in text.split("\x00") for s in _SENTENCE_END.split(block) if s.strip()]
 
 
-def contradictions(text: str) -> list:
-    """Statements that say CodeTonight receives, keeps or reads the user's data."""
-    return [s for s in _SENTENCE_END.split(text)
-            if not s.rstrip().endswith("?") and _WHAT.search(s)
-            and any(_admits(clause) for clause in _CLAUSE_BREAK.split(s))]
+def data_sentences(raw: str) -> list:
+    """Sentences that mention CodeTonight (or we, us, our) and the user's data."""
+    return [s for s in sentences(raw) if _WHO.search(s) and _WHAT.search(s)]
 
 
-def test_the_privacy_page_keeps_every_promise():
-    text = _text("privacy.html")
-    for promise in PRIVACY_PROMISES:
-        assert promise in text, f"the privacy page lost: {promise!r}"
+def test_the_pages_say_exactly_the_reviewed_things_about_your_data():
+    for page, reviewed in REVIEWED.items():
+        found = data_sentences((SITE / page).read_text(encoding="utf-8"))
+        added = [s for s in found if s not in reviewed]
+        removed = [s for s in reviewed if s not in found]
+        assert not added and not removed, (
+            f"{page}: read these sentences about CodeTonight and your data, then update REVIEWED. "
+            f"New or changed: {added}. Gone: {removed}.")
 
 
-def test_the_home_page_keeps_its_promise():
-    assert "No CodeTonight server sees your data" in _text("index.html")
-
-
-def test_no_page_says_that_codetonight_receives_the_data():
-    for page in ("privacy.html", "index.html"):
-        found = contradictions(_text(page))
-        assert not found, f"{page} now says {found}"
-
-
-def test_the_check_catches_a_contradiction_in_any_wording():
+def test_a_new_statement_about_the_data_needs_review_whatever_its_wording():
+    # Wordings the old pattern tripwire let through (google-vibe-os#43, #45).
     for claim in (
         "Your mail is uploaded to CodeTonight.",
-        "CodeTonight receives the data.",
-        "CodeTonight’s servers store your Gmail messages.",
-        "Your data is sent to CodeTonight for processing.",
-        "Your data is not sold to advertisers, but it is uploaded to CodeTonight.",
-        "CodeTonight reads your mail to rank it.",
+        "CodeTonight stores your mail without encrypting it.",
+        "Your data is not only stored by CodeTonight but also sold.",
+        "We store your Gmail messages.",
+        "CodeTonight’s servers keep copies of your emails.",
     ):
-        assert contradictions(claim), claim
+        assert data_sentences(f"<p>{claim}</p>") == [claim], claim
 
 
-def test_the_check_leaves_a_denial_alone():
-    for denial in (
-        "It is not sent to CodeTonight.",
-        "Your data is never sent to CodeTonight.",
-        "No data is sent to CodeTonight.",
-        "CodeTonight runs no server that receives your Google data.",
-        "CodeTonight doesn’t store your mail.",
-        "Is my data sent to CodeTonight? No.",
-        "No person at CodeTonight reads your Google data.",
-    ):
-        assert not contradictions(denial), denial
+def test_a_heading_or_a_button_never_joins_the_next_sentence():
+    raw = ("<h2>Join the beta</h2><p>We use your email only to send your beta invitation.</p>"
+           "<form><button>Join the beta</button></form><p>We will email your invitation.</p>")
+    assert data_sentences(raw) == [
+        "We use your email only to send your beta invitation.", "We will email your invitation."]
