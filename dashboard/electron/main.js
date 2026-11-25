@@ -18,7 +18,7 @@ const googleAuth = require('./google-auth');
 const scopes = require('./scopes');
 const urlTrust = require('./url-trust');
 const { googlePageUrl } = require('./google-links');
-const mailAdvice = require('./mail-advice');
+const { fetchInbox } = require('./inbox-fetch');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -259,57 +259,9 @@ function stopSyncController() {
 // Shared by IPC handlers and AI agent tools
 // ========================================
 
-// Whether you wrote the conversation's last message; null when it cannot be read.
-async function repliedByMeInThread(gmail, threadId) {
-    try {
-        const thread = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'minimal' });
-        return mailAdvice.lastMessageIsMine(thread.data.messages);
-    } catch (e) {
-        log.warn('Could not read the conversation to check for a reply', e?.message);
-        return null;
-    }
-}
-
-async function fetchInboxItem(gmail, msg) {
-    const detail = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'metadata' });
-    const headers = detail.data.payload.headers;
-    const labelIds = detail.data.labelIds || [];
-    const date = headers.find(h => h.name === 'Date')?.value || '';
-    const automated = mailAdvice.isAutomated(headers, labelIds);
-    // Bulk mail never needs the conversation check, so it costs no extra call.
-    const repliedByMe = automated ? false : await repliedByMeInThread(gmail, msg.threadId);
-    const arrived = mailAdvice.receivedAt(detail.data.internalDate, date);
-    const { advice, reason } = mailAdvice.adviseFollowUp({ date: arrived, automated, repliedByMe });
-    return {
-        id: msg.id,
-        threadId: msg.threadId,
-        subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-        from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-        date,
-        receivedAt: arrived,
-        snippet: detail.data.snippet,
-        unread: labelIds.includes('UNREAD'),
-        advice,
-        adviceReason: reason
-    };
-}
-
+// The inbox with each message's age and follow-up advice (electron/inbox-fetch.js).
 async function fetchGmail(client, maxResults = 5) {
-    const gmail = google.gmail({ version: 'v1', auth: client });
-    const res = await gmail.users.messages.list({ userId: 'me', maxResults, labelIds: ['INBOX'] });
-    const messages = res.data.messages || [];
-
-    // Collect the results in place, then sort, so the list never follows the
-    // order in which the fetches happened to finish.
-    const items = await Promise.all(messages.map(async (msg) => {
-        try {
-            return await fetchInboxItem(gmail, msg);
-        } catch (e) {
-            log.error('Error fetching email details', e);
-            return null;
-        }
-    }));
-    return items.filter(Boolean).sort(mailAdvice.newestFirst);
+    return fetchInbox(google.gmail({ version: 'v1', auth: client }), maxResults, log);
 }
 
 async function fetchCalendar(client, days = 1) {

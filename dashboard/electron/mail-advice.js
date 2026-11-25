@@ -44,11 +44,19 @@ function isAutomated(headers, labelIds) {
     return NO_REPLY_SENDER.test(headerValue(headers, 'From'));
 }
 
-/** Whole days since the message arrived; null when the date cannot be read. */
+function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * Calendar days since the message arrived, in local time; null when the date
+ * cannot be read. This is the same rule as `daysAgo` in src/mail-age.js, so the
+ * age shown on a row and the advice under it always agree (a parity test pins it).
+ */
 function ageInDays(date, now) {
     const arrived = new Date(date);
     if (Number.isNaN(arrived.getTime())) return null;
-    return Math.max(0, Math.floor((now.getTime() - arrived.getTime()) / DAY_MS));
+    return Math.max(0, Math.round((startOfDay(now) - startOfDay(arrived)) / DAY_MS));
 }
 
 /**
@@ -93,6 +101,7 @@ function newestFirst(a, b) {
 
 module.exports = {
     FOLLOW_UP_AFTER_DAYS,
+    headerValue,
     isAutomated,
     ageInDays,
     adviseFollowUp,

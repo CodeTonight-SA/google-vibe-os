@@ -8,7 +8,7 @@ import { formatWhen, unreadCount } from '../mail-age';
 
 const HELP_TEXT = `VIBE TERMINAL
 ────────────────────────────────────────
-/inbox [n]     List unread emails (default 5)
+/inbox [n]     Recent inbox mail (default 5)
 /cal [range]   Events: today, week (default today)
 /drive [n]     Recent files (default 5)
 /clear         Clear terminal
@@ -24,7 +24,7 @@ const parseCommand = (input) => {
 
 const formatInbox = (emails, limit = 5) => {
     const list = emails.slice(0, limit);
-    if (!list.length) return 'INBOX\n────────────────────────────────────────\nNo unread emails';
+    if (!list.length) return 'INBOX\n────────────────────────────────────────\nThe inbox is empty';
 
     const lines = list.map((e, i) => {
         const from = e.from.split('<')[0].replace(/"/g, '').trim();

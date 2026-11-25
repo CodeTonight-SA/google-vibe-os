@@ -1,9 +1,22 @@
 import { describe, it, expect } from 'vitest'
+import { createRequire } from 'module'
 import { daysAgo, formatWhen, ageText, ageTone, unreadCount } from './mail-age'
+
+const require = createRequire(import.meta.url)
+const { ageInDays } = require('../electron/mail-advice.js')
 
 // Local times, so the calendar-day rules are tested in the machine's own time zone.
 const NOW = new Date(2026, 10, 24, 1, 30) // 24 November 2026, 01:30
 const at = (month, day, hour = 12, minute = 0) => new Date(2026, month, day, hour, minute)
+
+describe('one rule for the age shown and the advice', () => {
+  it('counts days exactly as the follow-up advice does, around midnight too', () => {
+    const moments = [at(10, 24, 0, 5), at(10, 23, 23, 59), at(10, 23, 0, 1), at(10, 22, 23, 30), at(10, 17), at(9, 25)]
+    for (const when of moments) {
+      expect(daysAgo(when, NOW)).toBe(ageInDays(when, NOW))
+    }
+  })
+})
 
 describe('daysAgo', () => {
   it('counts calendar days, so late last night is yesterday even two hours later', () => {

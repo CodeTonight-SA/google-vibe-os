@@ -1,6 +1,7 @@
 import { ageText, ageTone } from '../mail-age';
 
-const TONE_COLOURS = { fresh: 'var(--text-muted)', aging: '#b45309', old: '#b91c1c' };
+// The theme's brand orange, and the red the stylesheet already uses for errors (it has no token).
+const TONE_COLOURS = { fresh: 'var(--text-muted)', aging: 'var(--accent-brand)', old: '#dc2626' };
 
 const ADVICE_LABELS = {
     'follow-up': 'Follow up',
@@ -18,7 +19,7 @@ export default function MailAgeLine({ email }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline', marginTop: 4, fontSize: '0.75rem' }}>
             {age && <span style={{ color: TONE_COLOURS[ageTone(when)], fontWeight: 600 }}>{age}</span>}
             {label && (
-                <span style={{ color: email.advice === 'follow-up' ? '#b45309' : 'var(--text-muted)' }}>
+                <span style={{ color: email.advice === 'follow-up' ? TONE_COLOURS.aging : TONE_COLOURS.fresh }}>
                     {label}{email.adviceReason ? `: ${email.adviceReason}` : ''}
                 </span>
             )}

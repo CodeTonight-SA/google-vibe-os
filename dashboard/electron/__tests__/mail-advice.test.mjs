@@ -91,3 +91,18 @@ describe('the conversation, the date and the order', () => {
     expect(ageInDays(daysBefore(12), NOW)).toBe(12)
   })
 })
+
+describe('calendar days and odd conversations', () => {
+  // Local times, so the rule is tested in the machine's own time zone.
+  const LOCAL_NOW = new Date(2026, 10, 24, 1, 30)
+
+  it('counts mail from late on the night before last as two days old, so it earns the follow-up', () => {
+    const lateNight = new Date(2026, 10, 22, 23, 30)
+    expect(ageInDays(lateNight, LOCAL_NOW)).toBe(2)
+    expect(adviseFollowUp({ date: lateNight, automated: false, repliedByMe: false, now: LOCAL_NOW }).advice).toBe('follow-up')
+  })
+
+  it('reads a conversation message with no labels as not yours, without throwing', () => {
+    expect(lastMessageIsMine([{}])).toBe(false)
+  })
+})
