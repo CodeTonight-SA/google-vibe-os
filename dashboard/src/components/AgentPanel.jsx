@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Terminal, ChevronRight, RotateCcw, Settings } from 'lucide-react';
-import { formatWhen, unreadCount } from '../mail-age';
+import { formatWhen, messageAgeDays, senderName, unreadCount } from '../mail-age';
 
 // ============================================================
 // Help text & Slash Command Infrastructure (unchanged)
@@ -27,8 +27,8 @@ const formatInbox = (emails, limit = 5) => {
     if (!list.length) return 'INBOX\n────────────────────────────────────────\nThe inbox is empty';
 
     const lines = list.map((e, i) => {
-        const from = e.from.split('<')[0].replace(/"/g, '').trim();
-        const time = formatWhen(e.receivedAt || e.date);
+        const from = senderName(e.from);
+        const time = formatWhen(e.receivedAt || e.date, new Date(), messageAgeDays(e));
         const num = String(i + 1).padStart(2, '0');
         const fromPad = from.slice(0, 26).padEnd(26);
         return `${num}  ${fromPad}  ${time}\n    ${e.subject.slice(0, 38)}`;
