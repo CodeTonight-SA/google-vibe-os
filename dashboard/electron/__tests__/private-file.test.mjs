@@ -37,26 +37,35 @@ function looseFile(name) {
   return p
 }
 
-// Spy on a write function. For each call, record the file written, its mode
-// before and after the write, and whether the target still held 'old' then.
-function recordWrites(target, owner, name) {
+// Spy on a path-based write. For each call, record the file written and its
+// mode before the write. A write to an open file descriptor is passed through.
+function recordWrites(owner, name) {
   const real = owner[name]
   const seen = []
   vi.spyOn(owner, name).mockImplementation((file, ...rest) => {
-    const before = fs.existsSync(file) ? modeOf(file) : null
-    const note = () => seen.push({ file, before, mode: modeOf(file), targetOld: fs.readFileSync(target, 'utf8') === 'old' })
-    const result = real(file, ...rest)
-    if (result && typeof result.then === 'function') return result.then((r) => { note(); return r })
-    note()
-    return result
+    if (typeof file === 'string') seen.push({ file, before: fs.existsSync(file) ? modeOf(file) : null })
+    return real(file, ...rest)
+  })
+  return seen
+}
+
+// Spy on a rename. For each call, record what is moved where, and at that
+// moment the moved file's mode and content and whether the target still held 'old'.
+function recordRenames(owner, name) {
+  const real = owner[name]
+  const seen = []
+  vi.spyOn(owner, name).mockImplementation((from, to, ...rest) => {
+    seen.push({ to, mode: modeOf(from), content: fs.readFileSync(from, 'utf8'), targetOld: fs.readFileSync(to, 'utf8') === 'old' })
+    return real(from, to, ...rest)
   })
   return seen
 }
 
 function expectReplacedInOneStep(p, seen) {
   expect(seen).toHaveLength(1)
-  expect(seen[0].file).not.toBe(fs.realpathSync(p))
+  expect(seen[0].to).toBe(fs.realpathSync(p))
   expect(seen[0].mode).toBe(0o600)
+  expect(seen[0].content).toBe('secret')
   expect(seen[0].targetOld).toBe(true)
   expect(fs.readFileSync(p, 'utf8')).toBe('secret')
   expect(modeOf(p)).toBe(0o600)
@@ -66,14 +75,14 @@ function expectReplacedInOneStep(p, seen) {
 describe('writePrivateFile and writePrivateFileSync', () => {
   it.skipIf(!POSIX)('write the new content only into an owner-only file, then replace the target', async () => {
     const p = looseFile('a.json')
-    const seen = recordWrites(p, fs.promises, 'writeFile')
+    const seen = recordRenames(fs.promises, 'rename')
     await writePrivateFile(p, 'secret')
     expectReplacedInOneStep(p, seen)
   })
 
   it.skipIf(!POSIX)('do the same when the write is synchronous', () => {
     const p = looseFile('b.json')
-    const seen = recordWrites(p, fs, 'writeFileSync')
+    const seen = recordRenames(fs, 'renameSync')
     writePrivateFileSync(p, 'secret')
     expectReplacedInOneStep(p, seen)
   })
@@ -110,7 +119,7 @@ describe('when the rename is refused, the file is written in place, tightened fi
   it.skipIf(!POSIX)('asynchronous', async () => {
     const p = looseFile('c.json')
     vi.spyOn(fs.promises, 'rename').mockRejectedValue(refused('EPERM'))
-    const seen = recordWrites(p, fs.promises, 'writeFile')
+    const seen = recordWrites(fs.promises, 'writeFile')
     await writePrivateFile(p, 'secret')
     expectInPlace(p, seen)
   })
@@ -118,9 +127,38 @@ describe('when the rename is refused, the file is written in place, tightened fi
   it.skipIf(!POSIX)('synchronous', () => {
     const p = looseFile('d.json')
     vi.spyOn(fs, 'renameSync').mockImplementation(() => { throw refused('EBUSY') })
-    const seen = recordWrites(p, fs, 'writeFileSync')
+    const seen = recordWrites(fs, 'writeFileSync')
     writePrivateFileSync(p, 'secret')
     expectInPlace(p, seen)
+  })
+})
+
+describe('the new content is on disk before it replaces the old file', () => {
+  it.skipIf(!POSIX)('asynchronous', async () => {
+    const p = looseFile('e.json')
+    const order = []
+    const realOpen = fs.promises.open
+    vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await realOpen(...args)
+      const realSync = handle.sync.bind(handle)
+      handle.sync = async () => { order.push('sync'); return realSync() }
+      return handle
+    })
+    const realRename = fs.promises.rename
+    vi.spyOn(fs.promises, 'rename').mockImplementation(async (...args) => { order.push('rename'); return realRename(...args) })
+    await writePrivateFile(p, 'secret')
+    expect(order).toEqual(['sync', 'rename'])
+  })
+
+  it.skipIf(!POSIX)('synchronous', () => {
+    const p = looseFile('f.json')
+    const order = []
+    const realFsync = fs.fsyncSync
+    const realRename = fs.renameSync
+    vi.spyOn(fs, 'fsyncSync').mockImplementation((...args) => { order.push('sync'); return realFsync(...args) })
+    vi.spyOn(fs, 'renameSync').mockImplementation((...args) => { order.push('rename'); return realRename(...args) })
+    writePrivateFileSync(p, 'secret')
+    expect(order).toEqual(['sync', 'rename'])
   })
 })
 

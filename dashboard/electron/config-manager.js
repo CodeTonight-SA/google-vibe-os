@@ -54,13 +54,19 @@ class ConfigManager {
 
     /**
      * The folders the app chose itself. A folder named in GOOGOL_VIBE_CONFIG_DIR
-     * or GOOGLE_TOKEN_DIR is the user's to manage, so it is left as it is.
+     * or GOOGLE_TOKEN_DIR is the user's to manage, so start-up leaves its mode
+     * alone (a missing config folder is still created owner-only).
      */
     _ownFolders() {
         const own = [];
         if (!process.env.GOOGOL_VIBE_CONFIG_DIR) own.push(this.configDir);
-        if (!process.env.GOOGLE_TOKEN_DIR) own.push(path.join(this.configDir, 'tokens'));
+        if (!process.env.GOOGLE_TOKEN_DIR) own.push(this._tokensDir());
         return own;
+    }
+
+    /** The app's own token folder, inside the config folder; the one place it is spelt out. */
+    _tokensDir() {
+        return path.join(this.configDir, 'tokens');
     }
 
     /** Where the recurring-task rules live; the one place this path is spelt out. */
@@ -96,7 +102,7 @@ class ConfigManager {
     _ensureDirectories() {
         const dirs = [
             this.configDir,
-            path.join(this.configDir, 'tokens')
+            this._tokensDir()
         ];
 
         for (const dir of dirs) {
@@ -220,7 +226,7 @@ class ConfigManager {
         }
 
         // New unified location
-        return path.join(this.configDir, 'tokens', `token_${service}.json`);
+        return path.join(this._tokensDir(), `token_${service}.json`);
     }
 
     /**

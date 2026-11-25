@@ -2,10 +2,11 @@
  * Files only this user may read: the client file, the tokens, the settings and
  * the recurring-task rules.
  *
- * A write goes to a temporary file beside the target, created owner-only, and
- * is then renamed over the target (#41). So the new content is never in a file
- * other users can read, and a crash mid-write leaves the old file whole. A
- * symlinked file keeps its link: the file it points to is the one replaced.
+ * A write goes to a temporary file beside the target, created owner-only,
+ * flushed to disk, and then renamed over the target (#41). So the new content
+ * is never in a file other users can read, and a crash or power loss mid-write
+ * leaves the old file whole. A symlinked file keeps its link: the file it
+ * points to is the one replaced.
  *
  * Where the rename is refused (another program holds the file on Windows, a
  * disk that will not do it), the file is written in place instead: tightened
@@ -48,11 +49,33 @@ function realTargetSync(filePath) {
     }
 }
 
+// The temporary file is flushed to disk before the rename, so after a power
+// loss the target holds the old content or the new, never a cut-short file.
+async function writeDurably(temp, content) {
+    const handle = await fs.promises.open(temp, 'wx', PRIVATE_FILE_MODE);
+    try {
+        await handle.writeFile(content);
+        await handle.sync();
+    } finally {
+        await handle.close();
+    }
+}
+
+function writeDurablySync(temp, content) {
+    const fd = fs.openSync(temp, 'wx', PRIVATE_FILE_MODE);
+    try {
+        fs.writeFileSync(fd, content);
+        fs.fsyncSync(fd);
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
 async function writePrivateFile(filePath, content) {
     const target = await realTarget(filePath);
     const temp = tempPathFor(target);
     try {
-        await fs.promises.writeFile(temp, content, { mode: PRIVATE_FILE_MODE, flag: 'wx' });
+        await writeDurably(temp, content);
         await fs.promises.rename(temp, target);
         return;
     } catch (err) {
@@ -75,7 +98,8 @@ function discardSync(temp) {
     try {
         fs.rmSync(temp, { force: true });
     } catch {
-        // A leftover temporary file is owner-only, so it exposes nothing.
+        // A leftover temporary file is no more readable than its target: owner-only
+        // where the disk keeps modes, and like every file there where it does not.
     }
 }
 
@@ -83,7 +107,7 @@ function writePrivateFileSync(filePath, content) {
     const target = realTargetSync(filePath);
     const temp = tempPathFor(target);
     try {
-        fs.writeFileSync(temp, content, { mode: PRIVATE_FILE_MODE, flag: 'wx' });
+        writeDurablySync(temp, content);
         fs.renameSync(temp, target);
         return;
     } catch (err) {
