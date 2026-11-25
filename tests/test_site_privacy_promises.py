@@ -1,11 +1,12 @@
-"""What the website says about CodeTonight and the user's data stays reviewed.
+"""What the website says about the user's data stays reviewed.
 
-Every sentence on the two pages that mentions CodeTonight (or "we", "us",
-"our") together with the user's data must match the reviewed list below, word
-for word. A new, changed or removed sentence fails the test until a person
-reads it and updates REVIEWED. This replaces a word-pattern tripwire that each
-review found a new way past (google-vibe-os#43, #45): a list does not have to
-guess what a sentence means.
+Every sentence on every page in site/ that mentions the user's data (mail,
+calendar, files, tokens and the like) must match the reviewed list below, word
+for word, whoever it names as the subject. A new, changed or removed sentence,
+or a new page, fails the test until a person reads it and updates REVIEWED; the
+failure prints the sentences found, ready to paste. This replaces a word-pattern
+tripwire that each review found a new way past (google-vibe-os#43, #45, #47): a
+list does not have to guess what a sentence means.
 """
 
 import html
@@ -14,30 +15,53 @@ from pathlib import Path
 
 SITE = Path(__file__).resolve().parents[1] / "site"
 
+# A block-level tag ends a sentence. <br> does not: it can sit mid-sentence.
 _BLOCK_END = re.compile(
-    r"(?i)</(?:p|h[1-6]|li|div|section|header|footer|td|th|dt|dd|blockquote|summary|button|form|label)>"
-    r"|<br\s*/?>")
+    r"(?i)</(?:p|h[1-6]|li|div|section|header|footer|td|th|dt|dd|blockquote|summary|button|form|label)>")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
-_WHO = re.compile(r"(?i)\b(?:CodeTonight|we|us|our)\b")
 _WHAT = re.compile(r"(?i)\b(?:data|Gmail|mail|e-?mails?|messages|calendar|Drive|files|tokens?|information)\b")
 
 REVIEWED = {
-    "privacy.html": [
-        "CodeTonight runs no server that receives your Google data, and never receives your sign-in tokens.",
-        "The app fetches your Google data from Google straight to your Mac; it is not sent to CodeTonight.",
-        "CodeTonight does not receive this data.",
-        "We use your Google data only to provide the features you see in the app.",
-        "We do not sell it, transfer it to advertising platforms or data brokers, or use it for advertising.",
-        "No person at CodeTonight reads your Google data.",
-        "When you join the beta on this website, the name and email address you type, and anything you write "
-        "in the optional box, are sent to Formspree, a form service, which passes them to CodeTonight.",
-        "To have your beta sign-up deleted, email us at the contact address below.",
-    ],
     "index.html": [
-        "No CodeTonight server sees your data.",
-        "Leave your name and email, and we will send you an invitation with the download and the sign-in steps.",
-        "We use your email only to send your beta invitation.",
-        "We will email your invitation.",
+        'A premium desktop dashboard that brings Gmail, Calendar, Drive & Tasks together in one '
+        'beautiful interface.',
+        'Gmail, Calendar, Drive, and Tasks in one cohesive interface.',
+        'Ask about your mail, calendar, files and tasks with your own Anthropic API key.',
+        'No CodeTonight server sees your data.',
+        'Enable the Gmail, Calendar, Drive and Tasks APIs.',
+        'Leave your name and email, and we will send you an invitation with the download and the '
+        'sign-in steps.',
+        'Email',
+        'We use your email only to send your beta invitation.',
+        'We will email your invitation.',
+    ],
+    "privacy.html": [
+        'CodeTonight runs no server that receives your Google data, and never receives your sign-in tokens.',
+        'Either way, your data goes directly between your Mac and Google.',
+        'Your name, email address and profile picture, to show who is signed in.',
+        'Gmail, Google Calendar and Google Drive: read-only.',
+        'Where your data is kept',
+        'The app fetches your Google data from Google straight to your Mac; it is not sent to CodeTonight.',
+        'Your sign-in token is stored on your Mac in ~/.googol-vibe/tokens/ , encrypted with the '
+        'macOS keychain when it is available.',
+        'Other files on your Mac:',
+        'When you ask it something, your message and the Google data it fetches to answer (for '
+        "example email text, calendar events, Drive file names and tasks) are sent to Anthropic's "
+        "API under your own key, and Anthropic's terms apply to that data.",
+        'CodeTonight does not receive this data.',
+        'A report contains the error details, the app version and the operating system; the app '
+        'removes email addresses, user names and network details before it sends one.',
+        'Google API Services User Data Policy',
+        'The use of information received from Google Workspace scopes will adhere to the Google '
+        'User Data Policy , including the Limited Use requirements.',
+        'We use your Google data only to provide the features you see in the app.',
+        'We do not sell it, transfer it to advertising platforms or data brokers, or use it for advertising.',
+        'No person at CodeTonight reads your Google data.',
+        'When you join the beta on this website, the name and email address you type, and '
+        'anything you write in the optional box, are sent to Formspree, a form service, which '
+        'passes them to CodeTonight.',
+        "Sign out in the app: this asks Google to end the app's access and deletes the token from your Mac.",
+        'To have your beta sign-up deleted, email us at the contact address below.',
     ],
 }
 
@@ -50,8 +74,13 @@ def sentences(raw: str) -> list:
 
 
 def data_sentences(raw: str) -> list:
-    """Sentences that mention CodeTonight (or we, us, our) and the user's data."""
-    return [s for s in sentences(raw) if _WHO.search(s) and _WHAT.search(s)]
+    """Sentences that mention the user's data, whatever their subject."""
+    return [s for s in sentences(raw) if _WHAT.search(s)]
+
+
+def test_every_page_has_a_reviewed_list():
+    assert sorted(p.name for p in SITE.glob("*.html")) == sorted(REVIEWED), (
+        "a page was added or removed in site/; give it a REVIEWED entry")
 
 
 def test_the_pages_say_exactly_the_reviewed_things_about_your_data():
@@ -60,20 +89,21 @@ def test_the_pages_say_exactly_the_reviewed_things_about_your_data():
         added = [s for s in found if s not in reviewed]
         removed = [s for s in reviewed if s not in found]
         assert not added and not removed, (
-            f"{page}: read these sentences about CodeTonight and your data, then update REVIEWED. "
-            f"New or changed: {added}. Gone: {removed}.")
+            f"{page}: read these sentences about your data, then update REVIEWED. "
+            f"New or changed: {added}. Gone: {removed}. Everything found, to paste: {found}")
 
 
 def test_a_new_statement_about_the_data_needs_review_whatever_its_wording():
-    # Wordings the old pattern tripwire let through (google-vibe-os#43, #45).
+    # Wordings the old pattern tripwire let through (google-vibe-os#43, #45, #47).
     for claim in (
         "Your mail is uploaded to CodeTonight.",
         "CodeTonight stores your mail without encrypting it.",
         "Your data is not only stored by CodeTonight but also sold.",
         "We store your Gmail messages.",
-        "CodeTonight’s servers keep copies of your emails.",
+        "Your messages are uploaded to the company's servers.",
     ):
         assert data_sentences(f"<p>{claim}</p>") == [claim], claim
+    assert data_sentences("<p>We store your<br>Gmail messages.</p>") == ["We store your Gmail messages."]
 
 
 def test_a_heading_or_a_button_never_joins_the_next_sentence():
