@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Radio, Settings, LogOut, Moon, Sun, ChevronDown } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Mail, Calendar, HardDrive, Clock, FileText, User, LogIn, Video, CheckSquare, FileSpreadsheet, Presentation, Plus, StickyNote, RefreshCw, ExternalLink, Settings, LogOut, Moon, Sun, ChevronDown } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 import logoImg from './assets/logo.webp';
 import { motion } from 'framer-motion';
@@ -10,6 +10,8 @@ import { useToast, ToastContainer } from './components/Toast';
 import SettingsPanel from './components/SettingsPanel';
 import EmptyState from './components/EmptyState';
 import { gmailUrl, docUrl, docType } from './google-urls';
+import { unreadCount } from './mail-age';
+import InboxList from './components/InboxList';
 
 // Skeleton loader - Swiss Nihilism style
 const Skeleton = ({ width = '100%', height = 16, className = '' }) => (
@@ -651,7 +653,7 @@ function App() {
                                         <div className="card-title">
                                             <Mail color="#ea580c" size={18} /> Inbox
                                         </div>
-                                        <span className="badge">{emails.length} New</span>
+                                        <span className="badge">{unreadCount(emails)} Unread</span>
                                     </div>
                                     <div className="widget-scroll">
                                         {loadingStates.emails ? (
@@ -662,24 +664,7 @@ function App() {
                                                 <SkeletonListItem />
                                             </>
                                         ) : emails.length > 0 ? (
-                                            emails.map(email => (
-                                                <div
-                                                    key={email.id}
-                                                    className="list-item"
-                                                    onClick={() => openGooglePage(gmailUrl(email))}
-                                                >
-                                                    <div className="list-content">
-                                                        <div className="item-title" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: email.unread ? 700 : 600 }}>
-                                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                {email.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
-                                                                {email.from.split('<')[0].replace(/"/g, '')}
-                                                            </span>
-                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'ui-monospace, "SF Mono", monospace', fontWeight: 400 }}>{new Date(email.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                        </div>
-                                                        <div className="item-sub" style={{ fontWeight: email.unread ? 600 : 400 }}>{email.subject}</div>
-                                                    </div>
-                                                </div>
-                                            ))
+                                            <InboxList emails={emails} onOpen={email => openGooglePage(gmailUrl(email))} />
                                         ) : (
                                             <EmptyState
                                                 icon={Mail}

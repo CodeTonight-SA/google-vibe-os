@@ -18,6 +18,7 @@ const googleAuth = require('./google-auth');
 const scopes = require('./scopes');
 const urlTrust = require('./url-trust');
 const { googlePageUrl } = require('./google-links');
+const { fetchInbox } = require('./inbox-fetch');
 
 log.info('[Googol Vibe] App starting — log transport active');
 
@@ -258,30 +259,9 @@ function stopSyncController() {
 // Shared by IPC handlers and AI agent tools
 // ========================================
 
+// The inbox with each message's age and follow-up advice (electron/inbox-fetch.js).
 async function fetchGmail(client, maxResults = 5) {
-    const gmail = google.gmail({ version: 'v1', auth: client });
-    const res = await gmail.users.messages.list({ userId: 'me', maxResults, labelIds: ['INBOX'] });
-    const messages = res.data.messages || [];
-
-    const emailList = [];
-    await Promise.all(messages.map(async (msg) => {
-        try {
-            const detail = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'metadata' });
-            const headers = detail.data.payload.headers;
-            emailList.push({
-                id: msg.id,
-                threadId: msg.threadId,
-                subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
-                from: headers.find(h => h.name === 'From')?.value || 'Unknown',
-                date: headers.find(h => h.name === 'Date')?.value || '',
-                snippet: detail.data.snippet,
-                unread: detail.data.labelIds?.includes('UNREAD') || false
-            });
-        } catch (e) {
-            log.error('Error fetching email details', e);
-        }
-    }));
-    return emailList;
+    return fetchInbox(google.gmail({ version: 'v1', auth: client }), maxResults, log);
 }
 
 async function fetchCalendar(client, days = 1) {

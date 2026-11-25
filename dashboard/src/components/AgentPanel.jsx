@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Terminal, ChevronRight, RotateCcw, Settings } from 'lucide-react';
+import { formatWhen, unreadCount } from '../mail-age';
 
 // ============================================================
 // Help text & Slash Command Infrastructure (unchanged)
@@ -7,7 +8,7 @@ import { Send, Terminal, ChevronRight, RotateCcw, Settings } from 'lucide-react'
 
 const HELP_TEXT = `VIBE TERMINAL
 ────────────────────────────────────────
-/inbox [n]     List unread emails (default 5)
+/inbox [n]     Recent inbox mail (default 5)
 /cal [range]   Events: today, week (default today)
 /drive [n]     Recent files (default 5)
 /clear         Clear terminal
@@ -21,31 +22,19 @@ const parseCommand = (input) => {
     return { cmd: parts[0].toLowerCase(), args: parts.slice(1) };
 };
 
-const formatTime = (date) => {
-    const now = new Date();
-    const diff = now - date;
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return date.toLocaleDateString([], { weekday: 'short' });
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-};
-
 const formatInbox = (emails, limit = 5) => {
     const list = emails.slice(0, limit);
-    if (!list.length) return 'INBOX\n────────────────────────────────────────\nNo unread emails';
+    if (!list.length) return 'INBOX\n────────────────────────────────────────\nThe inbox is empty';
 
     const lines = list.map((e, i) => {
         const from = e.from.split('<')[0].replace(/"/g, '').trim();
-        const date = new Date(e.date);
-        const time = formatTime(date);
+        const time = formatWhen(e.receivedAt || e.date);
         const num = String(i + 1).padStart(2, '0');
         const fromPad = from.slice(0, 26).padEnd(26);
         return `${num}  ${fromPad}  ${time}\n    ${e.subject.slice(0, 38)}`;
     });
 
-    return `INBOX (${emails.length} unread)\n────────────────────────────────────────\n${lines.join('\n\n')}`;
+    return `INBOX (${unreadCount(emails)} unread)\n────────────────────────────────────────\n${lines.join('\n\n')}`;
 };
 
 const formatCalendar = (events, range = 'today') => {
