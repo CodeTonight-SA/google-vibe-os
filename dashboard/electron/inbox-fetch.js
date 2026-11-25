@@ -31,6 +31,10 @@ function makeReplyCheck(gmail, log) {
     };
 }
 
+/**
+ * One inbox row with its age and advice. `replyCheck` is the shared check that
+ * fetchInbox passes for a whole listing; a single call gets its own.
+ */
 async function fetchInboxItem(gmail, msg, log, now = new Date(), replyCheck = makeReplyCheck(gmail, log)) {
     const detail = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'metadata' });
     const headers = detail.data.payload?.headers || [];

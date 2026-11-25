@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { createRequire } from 'module'
 
 const require = createRequire(import.meta.url)
-const { fetchInbox } = require('../inbox-fetch.js')
+const { fetchInbox, fetchInboxItem } = require('../inbox-fetch.js')
 
 const NOW = new Date('2026-11-24T12:00:00Z')
 const daysBefore = (n) => String(NOW.getTime() - n * 24 * 60 * 60 * 1000)
@@ -87,5 +87,18 @@ describe('one conversation read per conversation', () => {
     expect(items).toHaveLength(3)
     expect(gmail.users.threads.get).toHaveBeenCalledTimes(1)
     expect(items.every(i => i.advice === 'follow-up')).toBe(true)
+  })
+
+  it('reads the conversation again on the next fetch, so the answer is never stale', async () => {
+    const gmail = fakeGmail([person('m1', 3, { threadId: 't-shared' })])
+    await fetchInbox(gmail, 10, makeLog(), NOW)
+    await fetchInbox(gmail, 10, makeLog(), NOW)
+    expect(gmail.users.threads.get).toHaveBeenCalledTimes(2)
+  })
+
+  it('lets a single row be fetched on its own', async () => {
+    const msg = person('solo', 4)
+    const item = await fetchInboxItem(fakeGmail([msg]), { id: msg.id, threadId: msg.threadId }, makeLog(), NOW)
+    expect(item).toMatchObject({ id: 'solo', advice: 'follow-up', ageDays: 4 })
   })
 })

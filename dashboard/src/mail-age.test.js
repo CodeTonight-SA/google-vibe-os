@@ -55,6 +55,12 @@ describe('formatWhen', () => {
     expect(formatWhen(at(10, 23, 17, 1), NOW)).toBe('Yesterday')
     expect(formatWhen(at(10, 12, 17, 1), NOW)).not.toMatch(/^\d{1,2}[:.]\d{2}$/)
   })
+
+  it('uses the day count it is given, so it agrees with the age line and the advice', () => {
+    // Fetched just before midnight as "today"; still shown as today until the next fetch.
+    expect(formatWhen(at(10, 23, 23, 50), NOW, 0)).toMatch(/\d{1,2}[:.]\d{2}/)
+    expect(formatWhen(at(10, 23, 23, 50), NOW, 1)).toBe('Yesterday')
+  })
 })
 
 describe('ageText and ageTone', () => {

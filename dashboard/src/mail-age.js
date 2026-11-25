@@ -20,11 +20,14 @@ export function daysAgo(date, now = new Date()) {
     return Math.max(0, Math.round((startOfDay(now) - startOfDay(d)) / DAY_MS));
 }
 
-/** The time for today, "Yesterday", the weekday within a week, and otherwise the date. */
-export function formatWhen(date, now = new Date()) {
+/**
+ * The time for today, "Yesterday", the weekday within a week, and otherwise the
+ * date. Pass the message's own day count (messageAgeDays) so this column, the
+ * age line and the advice all describe the same moment.
+ */
+export function formatWhen(date, now = new Date(), days = daysAgo(date, now)) {
     const d = new Date(date);
-    const days = daysAgo(d, now);
-    if (days === null) return '';
+    if (days === null || Number.isNaN(d.getTime())) return '';
     if (days === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     if (days === 1) return 'Yesterday';
     if (days < 7) return d.toLocaleDateString([], { weekday: 'short' });
