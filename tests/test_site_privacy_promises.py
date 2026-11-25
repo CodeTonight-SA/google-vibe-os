@@ -42,7 +42,7 @@ REVIEWED = {
         'Gmail, Google Calendar and Google Drive: read-only.',
         'Where your data is kept',
         'The app fetches your Google data from Google straight to your Mac; it is not sent to CodeTonight.',
-        'Your sign-in token is stored on your Mac in ~/.googol-vibe/tokens/ , encrypted with the '
+        'Your sign-in token is stored on your Mac in ~/.googol-vibe/tokens/, encrypted with the '
         'macOS keychain when it is available.',
         'Other files on your Mac:',
         'When you ask it something, your message and the Google data it fetches to answer (for '
@@ -53,7 +53,7 @@ REVIEWED = {
         'removes email addresses, user names and network details before it sends one.',
         'Google API Services User Data Policy',
         'The use of information received from Google Workspace scopes will adhere to the Google '
-        'User Data Policy , including the Limited Use requirements.',
+        'User Data Policy, including the Limited Use requirements.',
         'We use your Google data only to provide the features you see in the app.',
         'We do not sell it, transfer it to advertising platforms or data brokers, or use it for advertising.',
         'No person at CodeTonight reads your Google data.',
@@ -67,9 +67,14 @@ REVIEWED = {
 
 
 def sentences(raw: str) -> list:
-    """The sentences of an HTML page; a block-level tag also ends a sentence."""
+    """The sentences of an HTML page as a reader sees them; a block-level tag also ends a sentence.
+
+    A removed inline tag leaves a space, so a space before punctuation is dropped
+    ("tokens/</code>, encrypted" reads "tokens/, encrypted", google-vibe-os#50).
+    """
     raw = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
     text = re.sub(r"\s+", " ", html.unescape(re.sub(r"(?s)<[^>]+>", " ", _BLOCK_END.sub("\x00", raw))))
+    text = re.sub(r" ([,.;:!?])", r"\1", text)
     return [s.strip() for block in text.split("\x00") for s in _SENTENCE_END.split(block) if s.strip()]
 
 
@@ -86,11 +91,17 @@ def test_every_page_has_a_reviewed_list():
 def test_the_pages_say_exactly_the_reviewed_things_about_your_data():
     for page, reviewed in REVIEWED.items():
         found = data_sentences((SITE / page).read_text(encoding="utf-8"))
+        # Compared in page order and with repeats, so a duplicated, deleted or
+        # moved sentence fails too (google-vibe-os#50).
         added = [s for s in found if s not in reviewed]
         removed = [s for s in reviewed if s not in found]
-        assert not added and not removed, (
-            f"{page}: read these sentences about your data, then update REVIEWED. "
+        assert found == reviewed, (
+            f"{page}: read these sentences about your data, then update REVIEWED, in page order. "
             f"New or changed: {added}. Gone: {removed}. Everything found, to paste: {found}")
+
+
+def test_a_removed_inline_tag_leaves_no_space_before_punctuation():
+    assert sentences("<p>Kept in <code>~/x/</code>, encrypted.</p>") == ["Kept in ~/x/, encrypted."]
 
 
 def test_a_new_statement_about_the_data_needs_review_whatever_its_wording():
