@@ -69,7 +69,8 @@ class ConfigManager {
 
         for (const dir of dirs) {
             if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
+                // New folders are this user's only; an existing folder is left as it is.
+                fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
             }
         }
     }
@@ -288,9 +289,12 @@ class ConfigManager {
             throw new Error('Invalid credentials file: missing client_id');
         }
 
-        // Copy to config directory
+        // Copy to config directory, readable by this user only: the file holds the
+        // client secret. writeFile's mode applies only when it creates the file,
+        // so chmod also tightens a file an older version left at 0644.
         const destPath = path.join(this.configDir, 'credentials.json');
-        await fs.promises.writeFile(destPath, content);
+        await fs.promises.writeFile(destPath, content, { mode: 0o600 });
+        await fs.promises.chmod(destPath, 0o600);
 
         log.info(`[ConfigManager] Credentials imported to: ${destPath}`);
         return destPath;
