@@ -5,7 +5,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 const { RRule } = require('rrule');
 const configManager = require('./config-manager');
 const log = require('./logger');
@@ -24,7 +23,7 @@ class RecurrenceManager {
      * Initialize the manager - must be called after app ready
      */
     init() {
-        this.filePath = path.join(configManager.configDir, 'recurrence.json');
+        this.filePath = configManager.getRecurrencePath();
         this.load();
     }
 

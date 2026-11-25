@@ -46,9 +46,14 @@ class ConfigManager {
         tightenExistingSync([
             path.join(this.configDir, 'credentials.json'),
             path.join(this.configDir, 'config.json'),
-            path.join(this.configDir, 'recurrence.json'),
+            this.getRecurrencePath(),
             this.getTokenPath(),
         ]);
+    }
+
+    /** Where the recurring-task rules live; the one place this path is spelt out. */
+    getRecurrencePath() {
+        return path.join(this.configDir, 'recurrence.json');
     }
 
     /**
